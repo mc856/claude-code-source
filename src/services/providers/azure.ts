@@ -32,6 +32,9 @@ const AZURE_OPENAI_CAPABILITIES: ProviderCapabilities = {
 
 export class AzureOpenAIAdapter extends OpenAIAdapter {
   override readonly capabilities = AZURE_OPENAI_CAPABILITIES
+  private azureADTokenProviderPromise?:
+    | Promise<() => Promise<string>>
+    | undefined
 
   constructor(private readonly azureConfig: AzureOpenAIProviderConfig) {
     // Pass a synthetic OpenAI config to satisfy the parent constructor.
@@ -63,18 +66,35 @@ export class AzureOpenAIAdapter extends OpenAIAdapter {
     return `${this.baseUrl}/openai/deployments/${encodeURIComponent(this.azureConfig.deployment)}/chat/completions?api-version=${encodeURIComponent(this.azureConfig.apiVersion)}`
   }
 
+  private async getAzureADTokenProvider(): Promise<() => Promise<string>> {
+    if (!this.azureADTokenProviderPromise) {
+      this.azureADTokenProviderPromise = (async () => {
+        const {
+          DefaultAzureCredential,
+          getBearerTokenProvider,
+        } = await import('@azure/identity')
+        return getBearerTokenProvider(
+          new DefaultAzureCredential(),
+          'https://cognitiveservices.azure.com/.default',
+        )
+      })()
+    }
+    return this.azureADTokenProviderPromise
+  }
+
   /**
-   * Azure uses `api-key` header for key-based auth.
-   * When no key is configured, the caller is expected to have set up
-   * DefaultAzureCredential before making requests (injected via environment).
+   * Azure uses `api-key` for key auth and a bearer token for Entra ID auth.
    */
-  override getHeaders(): Record<string, string> {
+  override async getHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'x-app': 'claude-code',
     }
     if (this.azureConfig.apiKey) {
       headers['api-key'] = this.azureConfig.apiKey
+    } else {
+      const getToken = await this.getAzureADTokenProvider()
+      headers.Authorization = `Bearer ${await getToken()}`
     }
     return headers
   }

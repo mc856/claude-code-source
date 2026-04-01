@@ -36,6 +36,7 @@ import { isRunningOnHomespace } from '../../utils/envUtils.js'
 import { errorMessage } from '../../utils/errors.js'
 import { logError } from '../../utils/log.js'
 import { getAPIProvider } from '../../utils/model/providers.js'
+import { getProviderConfig } from '../../services/providers/index.js'
 import { getInitialSettings } from '../../utils/settings/settings.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import {
@@ -292,6 +293,7 @@ export async function authStatus(opts: {
     }
   } else {
     const apiProvider = getAPIProvider()
+    const provider = getProviderConfig().provider
     const resolvedApiKeySource =
       apiKeySource !== 'none'
         ? apiKeySource
@@ -301,6 +303,7 @@ export async function authStatus(opts: {
     const output: Record<string, string | boolean | null> = {
       loggedIn,
       authMethod,
+      provider,
       apiProvider,
     }
     if (resolvedApiKeySource) {

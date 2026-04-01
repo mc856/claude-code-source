@@ -2,6 +2,7 @@
 import { MODEL_ALIASES } from './aliases.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import { getAPIProvider } from './providers.js'
+import { getProviderConfig, validateProviderConfig } from '../../services/providers/config.js'
 import { sideQuery } from '../sideQuery.js'
 import {
   NotFoundError,
@@ -21,6 +22,7 @@ export async function validateModel(
   model: string,
 ): Promise<{ valid: boolean; error?: string }> {
   const normalizedModel = model.trim()
+  const providerConfig = getProviderConfig()
 
   // Empty model is invalid
   if (!normalizedModel) {
@@ -35,19 +37,38 @@ export async function validateModel(
     }
   }
 
-  // Check if it's a known alias (these are always valid)
+  // Claude aliases are provider-specific; don't treat them as valid for
+  // OpenAI-compatible providers.
   const lowerModel = normalizedModel.toLowerCase()
-  if ((MODEL_ALIASES as readonly string[]).includes(lowerModel)) {
+  if (
+    providerConfig.provider === 'claude' &&
+    (MODEL_ALIASES as readonly string[]).includes(lowerModel)
+  ) {
     return { valid: true }
   }
 
   // Check if it matches ANTHROPIC_CUSTOM_MODEL_OPTION (pre-validated by the user)
-  if (normalizedModel === process.env.ANTHROPIC_CUSTOM_MODEL_OPTION) {
+  if (
+    providerConfig.provider === 'claude' &&
+    normalizedModel === process.env.ANTHROPIC_CUSTOM_MODEL_OPTION
+  ) {
     return { valid: true }
   }
 
   // Check cache first
   if (validModelCache.has(normalizedModel)) {
+    return { valid: true }
+  }
+
+  if (providerConfig.provider !== 'claude') {
+    const configResult = validateProviderConfig(providerConfig)
+    if (!configResult.valid) {
+      return { valid: false, error: configResult.errors[0] }
+    }
+
+    // OpenAI-compatible model identifiers and Azure deployment names are
+    // provider-specific; avoid misvalidating them through Anthropic sideQuery.
+    validModelCache.set(normalizedModel, true)
     return { valid: true }
   }
 

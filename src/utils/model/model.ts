@@ -24,6 +24,7 @@ import { formatModelPricing, getOpus46CostTier } from '../modelCost.js'
 import { getSettings_DEPRECATED } from '../settings/settings.js'
 import type { PermissionMode } from '../permissions/PermissionMode.js'
 import { getAPIProvider } from './providers.js'
+import { getProviderConfig } from '../../services/providers/config.js'
 import { LIGHTNING_BOLT } from '../../constants/figures.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import { type ModelAlias, isModelAlias } from './aliases.js'
@@ -32,6 +33,21 @@ import { capitalize } from '../stringUtils.js'
 export type ModelShortName = string
 export type ModelName = string
 export type ModelSetting = ModelName | ModelAlias | null
+
+function getActiveModelProvider() {
+  return getProviderConfig().provider
+}
+
+function getProviderModelEnvVar(): string | undefined {
+  switch (getActiveModelProvider()) {
+    case 'openai':
+      return process.env.OPENAI_MODEL
+    case 'azure-openai':
+      return process.env.AZURE_OPENAI_DEPLOYMENT
+    case 'claude':
+      return process.env.ANTHROPIC_MODEL
+  }
+}
 
 export function getSmallFastModel(): ModelName {
   return process.env.ANTHROPIC_SMALL_FAST_MODEL || getDefaultHaikuModel()
@@ -66,7 +82,7 @@ export function getUserSpecifiedModelSetting(): ModelSetting | undefined {
     specifiedModel = modelOverride
   } else {
     const settings = getSettings_DEPRECATED() || {}
-    specifiedModel = process.env.ANTHROPIC_MODEL || settings.model || undefined
+    specifiedModel = getProviderModelEnvVar() || settings.model || undefined
   }
 
   // Ignore the user-specified model if it's not in the availableModels allowlist.
@@ -176,6 +192,15 @@ export function getRuntimeMainLoopModel(params: {
  * @returns The default model setting to use
  */
 export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
+  switch (getActiveModelProvider()) {
+    case 'openai':
+      return process.env.OPENAI_MODEL || 'gpt-4o'
+    case 'azure-openai':
+      return process.env.AZURE_OPENAI_DEPLOYMENT || ''
+    case 'claude':
+      break
+  }
+
   // Ants default to defaultModel from flag config, or Opus 1M if not configured
   if (process.env.USER_TYPE === 'ant') {
     return (
@@ -447,6 +472,11 @@ export function parseUserSpecifiedModel(
 ): ModelName {
   const modelInputTrimmed = modelInput.trim()
   const normalizedModel = modelInputTrimmed.toLowerCase()
+  const activeProvider = getActiveModelProvider()
+
+  if (activeProvider !== 'claude') {
+    return modelInputTrimmed
+  }
 
   const has1mTag = has1mContext(normalizedModel)
   const modelString = has1mTag

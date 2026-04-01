@@ -26,3 +26,10 @@
 
 - [x] 5.1 Preserve Anthropic-only OAuth, bridge, session-ingress, and remote-control flows outside the generic provider abstraction.
 - [x] 5.2 Add explicit capability gating so Anthropic-only features are not presented as generic provider behavior.
+
+## 6. Remediation Follow-up
+
+- [x] 6.1 Implement real Azure OpenAI Entra ID authentication for the adapter path when `AZURE_OPENAI_API_KEY` is absent.
+- [x] 6.2 Connect provider configuration validation into startup so invalid OpenAI or Azure OpenAI settings fail before the first request.
+- [x] 6.3 Surface generic provider diagnostics in status output so OpenAI and Azure OpenAI selections report active provider, endpoint context, and limitations.
+- [x] 6.4 Stop routing non-Claude model validation and default model resolution through Anthropic-specific assumptions.

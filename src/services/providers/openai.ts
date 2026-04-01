@@ -379,7 +379,7 @@ export class OpenAIAdapter implements ProviderAdapter {
     return this.config.apiKey
   }
 
-  protected getHeaders(): Record<string, string> {
+  protected async getHeaders(): Promise<Record<string, string>> {
     return buildHeaders(this.apiKey)
   }
 
@@ -442,7 +442,7 @@ export class OpenAIAdapter implements ProviderAdapter {
     try {
       response = await fetch(this.getEndpointUrl(), {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         body: JSON.stringify(body),
         signal,
       })
