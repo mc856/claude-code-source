@@ -1,6 +1,16 @@
 import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../../services/analytics/index.js'
 import { isEnvTruthy } from '../envUtils.js'
 
+/**
+ * Internal Anthropic-compatible deployment sub-paths.
+ *
+ * These are distinct from the user-facing `ModelProvider` type in
+ * `src/services/providers/types.ts`, which covers the broader set
+ * ("claude" | "openai" | "azure-openai").  Code that needs to distinguish
+ * firstParty / Bedrock / Vertex / Foundry internally uses `APIProvider`.
+ * Code that needs to gate on the generic provider boundary uses `ModelProvider`
+ * via `getProviderConfig()` from `src/services/providers/config.ts`.
+ */
 export type APIProvider = 'firstParty' | 'bedrock' | 'vertex' | 'foundry'
 
 export function getAPIProvider(): APIProvider {

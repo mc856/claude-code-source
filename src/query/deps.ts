@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import { queryModelWithStreaming } from '../services/api/claude.js'
 import { autoCompactIfNeeded } from '../services/compact/autoCompact.js'
 import { microcompactMessages } from '../services/compact/microCompact.js'
+import { providerCallModel } from '../services/providers/registry.js'
 
 // -- deps
 
@@ -20,6 +21,8 @@ import { microcompactMessages } from '../services/compact/microCompact.js'
 // PRs can add runTools, handleStopHooks, logEvent, queue ops, etc.
 export type QueryDeps = {
   // -- model
+  // callModel type is anchored to queryModelWithStreaming so test fakes and
+  // provider adapters stay in sync with the real signature automatically.
   callModel: typeof queryModelWithStreaming
 
   // -- compaction
@@ -32,7 +35,10 @@ export type QueryDeps = {
 
 export function productionDeps(): QueryDeps {
   return {
-    callModel: queryModelWithStreaming,
+    // providerCallModel routes through the active ProviderAdapter.
+    // When CLAUDE_CODE_PROVIDER is unset (default), it delegates to
+    // queryModelWithStreaming with no behaviour change.
+    callModel: providerCallModel,
     microcompact: microcompactMessages,
     autocompact: autoCompactIfNeeded,
     uuid: randomUUID,
