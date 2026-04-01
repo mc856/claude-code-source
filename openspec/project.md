@@ -59,6 +59,14 @@ The near-term goal is to maintain a stable terminal-first AI coding assistant wh
 - Priority 2: After review, define a provider-abstraction change rather than attempting an Azure migration as scattered endpoint edits.
 - Priority 3: Defer major UI redesign and web-platform planning until the provider and protocol boundaries are better understood.
 
+## Current Phase Notes
+- For the current provider-abstraction phase, broader Anthropic-only feature audits outside the already-touched high-visibility entry points are tracked as follow-up work, not as immediate blockers for configurable `claude/openai/azure-openai` inference.
+- Automated validation remains important for completion confidence and task-state accuracy, but missing local test tooling is currently treated as a validation gap rather than a direct runtime blocker when code-path review and targeted remediation have already landed.
+- When automated validation is unavailable in the working environment, execution records should explicitly distinguish:
+  - code-path verification
+  - executed tests
+  - deferred validation follow-up
+
 ## Implementation-Oriented Code Review Findings
 
 ### End-to-End Inference Path

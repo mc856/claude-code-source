@@ -14,6 +14,10 @@ import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/gr
 import { logEvent } from '../../services/analytics/index.js'
 import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../../services/analytics/metadata.js'
 import { getCacheControl } from '../../services/api/claude.js'
+import {
+  getProviderConfig,
+  validateProviderModelCombination,
+} from '../../services/providers/index.js'
 import { parsePromptTooLongTokenCounts } from '../../services/api/errors.js'
 import { getDefaultMaxRetries } from '../../services/api/withRetry.js'
 import type { Tool, ToolPermissionContext, Tools } from '../../Tool.js'
@@ -1332,18 +1336,40 @@ type AutoModeConfig = {
  * then the main loop model.
  */
 function getClassifierModel(): string {
+  const providerConfig = getProviderConfig()
+  const fallbackModel = getMainLoopModel()
+
+  const maybeUseOverride = (candidate: string | undefined): string | undefined => {
+    if (!candidate) {
+      return undefined
+    }
+
+    const errors = validateProviderModelCombination(providerConfig, candidate)
+    if (errors.length === 0) {
+      return candidate
+    }
+
+    logForDebugging(
+      `[auto-mode] Ignoring classifier model override "${candidate}" for provider ` +
+        `"${providerConfig.provider}": ${errors[0]}`,
+      { level: 'warn' },
+    )
+    return undefined
+  }
+
   if (process.env.USER_TYPE === 'ant') {
-    const envModel = process.env.CLAUDE_CODE_AUTO_MODE_MODEL
+    const envModel = maybeUseOverride(process.env.CLAUDE_CODE_AUTO_MODE_MODEL)
     if (envModel) return envModel
   }
   const config = getFeatureValue_CACHED_MAY_BE_STALE(
     'tengu_auto_mode_config',
     {} as AutoModeConfig,
   )
-  if (config?.model) {
-    return config.model
+  const configuredModel = maybeUseOverride(config?.model)
+  if (configuredModel) {
+    return configuredModel
   }
-  return getMainLoopModel()
+  return fallbackModel
 }
 
 /**

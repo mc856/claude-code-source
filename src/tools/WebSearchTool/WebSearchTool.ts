@@ -6,7 +6,7 @@ import { getAPIProvider } from 'src/utils/model/providers.js'
 import type { PermissionResult } from 'src/utils/permissions/PermissionResult.js'
 import { z } from 'zod/v4'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
-import { queryModelWithStreaming } from '../../services/api/claude.js'
+import { assertAnthropicProvider, providerCallModel } from '../../services/providers/index.js'
 import { buildTool, type ToolDef } from '../../Tool.js'
 import { lazySchema } from '../../utils/lazySchema.js'
 import { logError } from '../../utils/log.js'
@@ -252,6 +252,8 @@ export const WebSearchTool = buildTool({
     return { result: true }
   },
   async call(input, context, _canUseTool, _parentMessage, onProgress) {
+    assertAnthropicProvider('Built-in web search tool')
+
     const startTime = performance.now()
     const { query } = input
     const userMessage = createUserMessage({
@@ -265,7 +267,7 @@ export const WebSearchTool = buildTool({
     )
 
     const appState = context.getAppState()
-    const queryStream = queryModelWithStreaming({
+    const queryStream = providerCallModel({
       messages: [userMessage],
       systemPrompt: asSystemPrompt([
         'You are an assistant for performing a web search tool use',

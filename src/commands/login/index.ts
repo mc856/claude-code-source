@@ -1,4 +1,5 @@
 import type { Command } from '../../commands.js'
+import { supportsOAuthSession } from '../../services/providers/index.js'
 import { hasAnthropicApiKeyAuth } from '../../utils/auth.js'
 import { isEnvTruthy } from '../../utils/envUtils.js'
 
@@ -9,6 +10,7 @@ export default () =>
     description: hasAnthropicApiKeyAuth()
       ? 'Switch Anthropic accounts'
       : 'Sign in with your Anthropic account',
-    isEnabled: () => !isEnvTruthy(process.env.DISABLE_LOGIN_COMMAND),
+    isEnabled: () =>
+      !isEnvTruthy(process.env.DISABLE_LOGIN_COMMAND) && supportsOAuthSession(),
     load: () => import('./login.js'),
   }) satisfies Command

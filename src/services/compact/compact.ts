@@ -9,6 +9,7 @@ const sessionTranscriptModule = feature('KAIROS')
 
 import { APIUserAbortError } from '@anthropic-ai/sdk'
 import { markPostCompaction } from 'src/bootstrap/state.js'
+import { providerCallModel } from '../../services/providers/index.js'
 import { getInvokedSkillsForAgent } from '../../bootstrap/state.js'
 import type { QuerySource } from '../../constants/querySource.js'
 import type { CanUseToolFn } from '../../hooks/useCanUseTool.js'
@@ -96,10 +97,7 @@ import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
 } from '../analytics/index.js'
-import {
-  getMaxOutputTokensForModel,
-  queryModelWithStreaming,
-} from '../api/claude.js'
+import { getMaxOutputTokensForModel } from '../api/claude.js'
 import {
   getPromptTooLongTokenGap,
   PROMPT_TOO_LONG_ERROR_MESSAGE,
@@ -1289,7 +1287,7 @@ async function streamCompactSummary({
           )
         : [FileReadTool]
 
-      const streamingGen = queryModelWithStreaming({
+      const streamingGen = providerCallModel({
         messages: normalizeMessagesForAPI(
           stripImagesFromMessages(
             stripReinjectedAttachments([

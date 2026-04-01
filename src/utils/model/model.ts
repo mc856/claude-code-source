@@ -50,7 +50,16 @@ function getProviderModelEnvVar(): string | undefined {
 }
 
 export function getSmallFastModel(): ModelName {
-  return process.env.ANTHROPIC_SMALL_FAST_MODEL || getDefaultHaikuModel()
+  const providerConfig = getProviderConfig()
+
+  switch (providerConfig.provider) {
+    case 'openai':
+      return providerConfig.model
+    case 'azure-openai':
+      return providerConfig.deployment
+    case 'claude':
+      return process.env.ANTHROPIC_SMALL_FAST_MODEL || getDefaultHaikuModel()
+  }
 }
 
 export function isNonCustomOpusModel(model: ModelName): boolean {

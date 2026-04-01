@@ -20,6 +20,7 @@
 import { randomUUID } from 'crypto'
 import type {
   BetaContentBlock,
+  BetaToolUnion,
   BetaUsage as Usage,
 } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import type {
@@ -29,6 +30,7 @@ import type {
   StreamEvent,
 } from '../../types/message.js'
 import type { Tools } from '../../Tool.js'
+import { logForDebugging } from '../../utils/debug.js'
 import type { SystemPrompt } from '../../utils/systemPromptType.js'
 import type { ThinkingConfig } from '../../utils/thinking.js'
 import type { Options } from '../api/claude.js'
@@ -123,6 +125,31 @@ type OpenAIErrorBody = {
 type ToolFallbackContext = {
   enabled: boolean
   attempted: boolean
+}
+
+type OpenAIToolChoice =
+  | 'auto'
+  | {
+      type: 'function'
+      function: { name: string }
+    }
+
+const ignoredOptionWarnings = new Set<string>()
+
+function warnIgnoredOptionOnce(
+  providerName: string,
+  optionName: string,
+  reason: string,
+): void {
+  const key = `${providerName}:${optionName}`
+  if (ignoredOptionWarnings.has(key)) {
+    return
+  }
+  ignoredOptionWarnings.add(key)
+  logForDebugging(
+    `[provider:${providerName}] Ignoring option "${optionName}": ${reason}`,
+    { level: 'warn' },
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +335,77 @@ async function toOpenAITools(
   return result
 }
 
+function toOpenAIExtraTools(extraToolSchemas: BetaToolUnion[]): OpenAITool[] {
+  const result: OpenAITool[] = []
+
+  for (const schema of extraToolSchemas) {
+    if (
+      typeof schema !== 'object' ||
+      schema === null ||
+      !('name' in schema) ||
+      typeof schema.name !== 'string' ||
+      !('input_schema' in schema) ||
+      typeof schema.input_schema !== 'object' ||
+      schema.input_schema === null
+    ) {
+      continue
+    }
+
+    const description =
+      'description' in schema && typeof schema.description === 'string'
+        ? schema.description
+        : ''
+
+    result.push({
+      type: 'function',
+      function: {
+        name: schema.name,
+        description,
+        parameters: schema.input_schema as Record<string, unknown>,
+      },
+    })
+  }
+
+  return result
+}
+
+function mergeOpenAITools(...toolSets: Array<OpenAITool[] | undefined>): OpenAITool[] {
+  const merged = new Map<string, OpenAITool>()
+
+  for (const toolSet of toolSets) {
+    for (const tool of toolSet ?? []) {
+      merged.set(tool.function.name, tool)
+    }
+  }
+
+  return [...merged.values()]
+}
+
+function toOpenAIToolChoice(
+  toolChoice: Options['toolChoice'],
+  openaiTools: OpenAITool[] | undefined,
+): OpenAIToolChoice | undefined {
+  if (!toolChoice || !openaiTools || openaiTools.length === 0) {
+    return undefined
+  }
+
+  if (toolChoice.type === 'auto') {
+    return 'auto'
+  }
+
+  const hasRequestedTool = openaiTools.some(
+    tool => tool.function.name === toolChoice.name,
+  )
+  if (!hasRequestedTool) {
+    return undefined
+  }
+
+  return {
+    type: 'function',
+    function: { name: toolChoice.name },
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Streaming SSE parser
 // ---------------------------------------------------------------------------
@@ -468,6 +566,10 @@ function buildHeaders(apiKey: string): Record<string, string> {
 export class OpenAIAdapter implements ProviderAdapter {
   constructor(protected readonly config: OpenAIProviderConfig) {}
 
+  protected get providerName(): string {
+    return 'openai'
+  }
+
   get capabilities(): ProviderCapabilities {
     return {
       ...OPENAI_CAPABILITIES,
@@ -489,6 +591,58 @@ export class OpenAIAdapter implements ProviderAdapter {
 
   protected get toolsEnabled(): boolean {
     return !this.config.disableTools
+  }
+
+  protected reportIgnoredOptions(options: Options): void {
+    if (options.fetchOverride) {
+      warnIgnoredOptionOnce(
+        this.providerName,
+        'fetchOverride',
+        'OpenAI-compatible adapters currently use native fetch.',
+      )
+    }
+    if (options.onStreamingFallback) {
+      warnIgnoredOptionOnce(
+        this.providerName,
+        'onStreamingFallback',
+        'OpenAI-compatible adapters do not use the Claude streaming fallback lifecycle.',
+      )
+    }
+    if (options.enablePromptCaching !== undefined) {
+      warnIgnoredOptionOnce(
+        this.providerName,
+        'enablePromptCaching',
+        'Anthropic prompt caching is not supported on OpenAI-compatible providers.',
+      )
+    }
+    if (options.skipCacheWrite) {
+      warnIgnoredOptionOnce(
+        this.providerName,
+        'skipCacheWrite',
+        'Cache-write controls are Anthropic-specific and are ignored here.',
+      )
+    }
+    if (options.hasPendingMcpServers) {
+      warnIgnoredOptionOnce(
+        this.providerName,
+        'hasPendingMcpServers',
+        'This advisor/server-side gating hint is not used by OpenAI-compatible adapters.',
+      )
+    }
+    if (options.advisorModel) {
+      warnIgnoredOptionOnce(
+        this.providerName,
+        'advisorModel',
+        'Advisor model support is currently Claude-only.',
+      )
+    }
+    if (options.taskBudget) {
+      warnIgnoredOptionOnce(
+        this.providerName,
+        'taskBudget',
+        'API-side task budget is currently Claude-only.',
+      )
+    }
   }
 
   protected async getHeaders(): Promise<Record<string, string>> {
@@ -541,6 +695,8 @@ export class OpenAIAdapter implements ProviderAdapter {
     options: Options
     toolFallback: ToolFallbackContext
   }): AsyncGenerator<StreamEvent | AssistantMessage | SystemAPIErrorMessage> {
+    this.reportIgnoredOptions(options)
+
     // Convert internal messages and tools to OpenAI format
     const openaiMessages = toOpenAIMessages(messages, systemPrompt)
     const allTools = [...tools, ...options.mcpTools]
@@ -548,13 +704,22 @@ export class OpenAIAdapter implements ProviderAdapter {
       toolFallback.enabled && allTools.length > 0
         ? await toOpenAITools(allTools, options)
         : undefined
+    const openaiExtraTools = toolFallback.enabled
+      ? toOpenAIExtraTools(options.extraToolSchemas ?? [])
+      : undefined
+    const mergedOpenAITools = mergeOpenAITools(openaiTools, openaiExtraTools)
+    const openaiToolChoice = toOpenAIToolChoice(
+      options.toolChoice,
+      mergedOpenAITools,
+    )
 
     const body: Record<string, unknown> = {
       model: options.model || this.model,
       messages: openaiMessages,
       stream: true,
       stream_options: { include_usage: true },
-      ...(openaiTools && openaiTools.length > 0 && { tools: openaiTools }),
+      ...(mergedOpenAITools.length > 0 && { tools: mergedOpenAITools }),
+      ...(openaiToolChoice && { tool_choice: openaiToolChoice }),
     }
 
     if (options.maxOutputTokensOverride) {
@@ -562,6 +727,9 @@ export class OpenAIAdapter implements ProviderAdapter {
     }
     if (options.temperatureOverride !== undefined) {
       body.temperature = options.temperatureOverride
+    }
+    if (options.stopSequences && options.stopSequences.length > 0) {
+      body.stop = options.stopSequences
     }
 
     let response: Response
@@ -573,7 +741,10 @@ export class OpenAIAdapter implements ProviderAdapter {
         signal,
       })
     } catch (fetchError) {
-      yield* this._yieldNetworkError(fetchError)
+      yield* this._yieldProviderError(
+        toProviderErrorFromNetwork(fetchError),
+        0,
+      )
       return
     }
 
@@ -582,7 +753,7 @@ export class OpenAIAdapter implements ProviderAdapter {
       if (
         toolFallback.enabled &&
         !toolFallback.attempted &&
-        openaiTools &&
+        mergedOpenAITools.length > 0 &&
         isToolUnsupportedError(response.status, httpError.body)
       ) {
         yield* this._stream({

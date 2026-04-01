@@ -376,6 +376,10 @@ export const SettingsSchema = lazySchema(() =>
         .string()
         .optional()
         .describe('Override the default model used by Claude Code'),
+      provider: z
+        .enum(['claude', 'openai', 'azure-openai'])
+        .optional()
+        .describe('Override the active model provider for Claude Code'),
       // Enterprise allowlist of models
       availableModels: z
         .array(z.string())

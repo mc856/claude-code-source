@@ -10,6 +10,7 @@ import {
 } from '../../bootstrap/state.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
 import type { ScopedMcpServerConfig } from '../../services/mcp/types.js'
+import { assertAnthropicProvider } from '../../services/providers/index.js'
 import { isInBundledMode } from '../bundledMode.js'
 import { getGlobalConfig, saveGlobalConfig } from '../config.js'
 import { logForDebugging } from '../debug.js'
@@ -93,6 +94,8 @@ export function setupClaudeInChrome(): {
   allowedTools: string[]
   systemPrompt: string
 } {
+  assertAnthropicProvider('Claude in Chrome')
+
   const isNativeBuild = isInBundledMode()
   const allowedTools = BROWSER_TOOLS.map(
     tool => `mcp__claude-in-chrome__${tool.name}`,

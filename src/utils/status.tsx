@@ -247,6 +247,14 @@ export function buildAPIProviderProperties(): Property[] {
     label: 'Endpoint',
     value: diagnostics.endpoint
   });
+  properties.push({
+    label: 'Model / Deployment',
+    value: diagnostics.resolvedModel
+  });
+  properties.push({
+    label: 'Credentials',
+    value: diagnostics.credentialSource
+  });
   if (diagnostics.limitations.length > 0) {
     properties.push({
       label: 'Provider notes',

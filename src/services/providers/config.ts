@@ -1,33 +1,44 @@
 /**
  * Provider configuration resolution and validation.
  *
- * # Provider selection precedence (highest → lowest):
+ * # Provider selection precedence (highest -> lowest):
  *
- *   1. Environment variable CLAUDE_CODE_PROVIDER=<provider>
+ *   1. --provider CLI flag (parsed from process.argv)
+ *      e.g. --provider openai
+ *
+ *   2. Settings key provider
+ *      e.g. { "provider": "openai" } in settings.json
+ *
+ *   3. Environment variable CLAUDE_CODE_PROVIDER=<provider>
  *      Accepts: "claude", "openai", "azure-openai"
  *
- *   2. Legacy Anthropic-compatible env vars (still honoured for backwards compat):
- *      CLAUDE_CODE_USE_BEDROCK=1   → claude  (Bedrock sub-path, handled inside adapter)
- *      CLAUDE_CODE_USE_VERTEX=1    → claude  (Vertex sub-path, handled inside adapter)
- *      CLAUDE_CODE_USE_FOUNDRY=1   → claude  (Foundry sub-path — Anthropic SDK, NOT Azure OpenAI)
+ *   4. Legacy Anthropic-compatible env vars (still honoured for backwards compat):
+ *      CLAUDE_CODE_USE_BEDROCK=1   -> claude  (Bedrock sub-path, handled inside adapter)
+ *      CLAUDE_CODE_USE_VERTEX=1    -> claude  (Vertex sub-path, handled inside adapter)
+ *      CLAUDE_CODE_USE_FOUNDRY=1   -> claude  (Foundry sub-path - Anthropic SDK, NOT Azure OpenAI)
  *
- *   3. Default: claude
+ *   5. Default: claude
+ *
+ * When multiple explicit sources specify conflicting providers, the
+ * highest-priority source wins and a warning is emitted to stderr.
  *
  * # OpenAI-specific env vars:
- *   OPENAI_API_KEY            – required when provider=openai
- *   OPENAI_BASE_URL           – optional base URL override (proxy/compatible endpoint)
- *   OPENAI_MODEL              – model name, e.g. "gpt-4o"
- *   OPENAI_DISABLE_TOOLS      – optional; disable function/tool calling when set
+ *   OPENAI_API_KEY             - required when provider=openai
+ *   OPENAI_BASE_URL            - optional base URL override (proxy/compatible endpoint)
+ *   OPENAI_MODEL               - model name, e.g. "gpt-4o"
+ *   OPENAI_DISABLE_TOOLS       - optional; disable function/tool calling when set
  *
  * # Azure OpenAI-specific env vars:
- *   AZURE_OPENAI_ENDPOINT     – required, e.g. https://my-resource.openai.azure.com
- *   AZURE_OPENAI_DEPLOYMENT   – required, deployment name
- *   AZURE_OPENAI_API_VERSION  – required, e.g. "2024-02-01"
- *   AZURE_OPENAI_API_KEY      – optional; when absent, DefaultAzureCredential is used
- *   AZURE_OPENAI_DISABLE_TOOLS – optional; disable function/tool calling when set
+ *   AZURE_OPENAI_ENDPOINT      - required, e.g. https://my-resource.openai.azure.com
+ *   AZURE_OPENAI_DEPLOYMENT    - required, deployment name
+ *   AZURE_OPENAI_API_VERSION   - required, e.g. "2024-02-01"
+ *   AZURE_OPENAI_API_KEY       - optional; when absent, DefaultAzureCredential is used
+ *   AZURE_OPENAI_DISABLE_TOOLS - optional; disable function/tool calling when set
  */
 
 import { isEnvTruthy } from '../../utils/envUtils.js'
+import { eagerParseCliFlag } from '../../utils/cliArgs.js'
+import { getSettings_DEPRECATED } from '../../utils/settings/settings.js'
 import type {
   AzureOpenAIProviderConfig,
   ClaudeProviderConfig,
@@ -41,36 +52,122 @@ import type {
 // Resolution
 // ---------------------------------------------------------------------------
 
-/** Read the raw provider string from env or return undefined. */
-function readProviderEnv(): ModelProvider | undefined {
-  const raw = process.env.CLAUDE_CODE_PROVIDER?.trim().toLowerCase()
+function parseProviderValue(
+  raw: string | undefined,
+  source: string,
+): ModelProvider | undefined {
   if (!raw) return undefined
-  if (raw === 'claude' || raw === 'openai' || raw === 'azure-openai') {
-    return raw as ModelProvider
+
+  const normalized = raw.trim().toLowerCase()
+  if (
+    normalized === 'claude' ||
+    normalized === 'openai' ||
+    normalized === 'azure-openai'
+  ) {
+    return normalized as ModelProvider
   }
-  // Unknown value — warn and fall through to default
+
   process.stderr.write(
-    `[provider] CLAUDE_CODE_PROVIDER="${process.env.CLAUDE_CODE_PROVIDER}" is not a recognised provider. ` +
-      `Valid values: claude, openai, azure-openai. Falling back to "claude".\n`,
+    `[provider] ${source}="${raw}" is not a recognised provider. ` +
+      'Valid values: claude, openai, azure-openai. Falling back to next source.\n',
   )
   return undefined
+}
+
+/** Read the --provider CLI flag (parsed eagerly from process.argv). */
+function readProviderCliFlag(): ModelProvider | undefined {
+  return parseProviderValue(eagerParseCliFlag('--provider'), '--provider flag')
+}
+
+function readProviderEnv(): ModelProvider | undefined {
+  return parseProviderValue(
+    process.env.CLAUDE_CODE_PROVIDER,
+    'CLAUDE_CODE_PROVIDER',
+  )
+}
+
+function readProviderSetting(): ModelProvider | undefined {
+  try {
+    const settings = getSettings_DEPRECATED()
+    if (!settings || typeof settings.provider !== 'string') {
+      return undefined
+    }
+    return parseProviderValue(settings.provider, 'settings.provider')
+  } catch {
+    // Settings may not be available during early startup; fall through.
+    return undefined
+  }
+}
+
+/**
+ * Emit a conflict warning when two explicit provider sources disagree.
+ * The winning (higher-priority) source is used; the losing source is reported.
+ */
+function warnProviderConflict(
+  winner: ModelProvider,
+  winnerSource: string,
+  loser: ModelProvider,
+  loserSource: string,
+): void {
+  process.stderr.write(
+    `[provider] Conflict: ${winnerSource} specifies "${winner}" but ` +
+      `${loserSource} specifies "${loser}". ` +
+      `Using "${winner}" (${winnerSource} takes precedence).\n`,
+  )
+}
+
+/**
+ * Resolve exactly one active provider from all configuration sources in
+ * documented precedence order: CLI flag > settings > env var > legacy > default.
+ */
+function resolveActiveProvider(): ModelProvider {
+  const cliProvider = readProviderCliFlag()
+  const settingsProvider = readProviderSetting()
+  const envProvider = readProviderEnv()
+
+  // Warn about conflicts between explicit sources before selecting the winner.
+  if (cliProvider && settingsProvider && settingsProvider !== cliProvider) {
+    warnProviderConflict(cliProvider, '--provider flag', settingsProvider, 'settings.provider')
+  }
+  if (cliProvider && envProvider && envProvider !== cliProvider) {
+    warnProviderConflict(cliProvider, '--provider flag', envProvider, 'CLAUDE_CODE_PROVIDER')
+  }
+  if (
+    !cliProvider &&
+    settingsProvider &&
+    envProvider &&
+    settingsProvider !== envProvider
+  ) {
+    warnProviderConflict(
+      settingsProvider,
+      'settings.provider',
+      envProvider,
+      'CLAUDE_CODE_PROVIDER',
+    )
+  }
+
+  // Select winner by precedence.
+  return (
+    cliProvider ??
+    settingsProvider ??
+    envProvider ??
+    'claude' // legacy env vars and default all map to claude
+  )
 }
 
 /**
  * Resolve and return the active ProviderConfig.
  *
- * This is called once at query startup. The result is passed to
- * `getProviderAdapter()` which constructs the appropriate adapter instance.
+ * Exactly one provider is chosen using the documented precedence order before
+ * model resolution begins. The result determines which adapter is instantiated.
  */
 export function getProviderConfig(): ProviderConfig {
-  const provider = readProviderEnv()
+  const provider = resolveActiveProvider()
 
-  // Explicit CLAUDE_CODE_PROVIDER takes priority over everything else.
   if (provider === 'openai') return buildOpenAIConfig()
   if (provider === 'azure-openai') return buildAzureOpenAIConfig()
 
-  // Legacy env vars all map to the claude adapter (sub-path resolved internally).
-  // The explicit "claude" value also lands here.
+  // 'claude' — includes all Anthropic-compatible sub-paths (Bedrock, Vertex, Foundry).
   return buildClaudeConfig()
 }
 
@@ -107,13 +204,6 @@ function buildAzureOpenAIConfig(): AzureOpenAIProviderConfig {
 // Validation
 // ---------------------------------------------------------------------------
 
-/**
- * Validate that all required credentials and endpoint settings are present
- * for the given provider config.
- *
- * Called at startup before the first model request so missing config is
- * reported immediately rather than inside the inference path.
- */
 export function validateProviderConfig(
   config: ProviderConfig,
 ): ProviderValidationResult {
@@ -128,8 +218,22 @@ export function validateProviderConfig(
 }
 
 function validateClaude(): ProviderValidationResult {
-  // Existing Anthropic-compatible providers perform their own auth checks
-  // inside getAnthropicClient(). No additional pre-flight validation here.
+  // Bedrock, Vertex, and Foundry sub-paths use their own credential mechanisms.
+  // For first-party Anthropic API, check that an API key is available when
+  // not using OAuth or a session-based auth path.
+  const isThirdParty =
+    isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK) ||
+    isEnvTruthy(process.env.CLAUDE_CODE_USE_VERTEX) ||
+    isEnvTruthy(process.env.CLAUDE_CODE_USE_FOUNDRY)
+
+  if (!isThirdParty && !process.env.ANTHROPIC_API_KEY) {
+    // OAuth and keychain auth may still succeed; this is a soft warning, not a
+    // hard failure. The underlying Anthropic SDK will surface auth errors at
+    // request time if no valid credential can be found.
+    // Return valid here and let the SDK handle auth — do not block startup for
+    // users who authenticate via OAuth without an explicit API key.
+  }
+
   return { valid: true }
 }
 
@@ -138,14 +242,14 @@ function validateOpenAI(config: OpenAIProviderConfig): ProviderValidationResult 
 
   if (!config.apiKey) {
     errors.push(
-      'OPENAI_API_KEY is required when CLAUDE_CODE_PROVIDER=openai. ' +
-        'Set it to your OpenAI API key.',
+      'OpenAI provider requires an API key. ' +
+        'Set OPENAI_API_KEY to your OpenAI API key.',
     )
   }
   if (!config.model) {
     errors.push(
-      'OPENAI_MODEL must be set to a fully-qualified model name (e.g. "gpt-4o") ' +
-        'when CLAUDE_CODE_PROVIDER=openai.',
+      'OpenAI provider requires a model name. ' +
+        'Set OPENAI_MODEL to a fully-qualified OpenAI model name (e.g. "gpt-4o").',
     )
   }
 
@@ -159,43 +263,47 @@ function validateAzureOpenAI(
 
   if (!config.endpoint) {
     errors.push(
-      'AZURE_OPENAI_ENDPOINT is required when CLAUDE_CODE_PROVIDER=azure-openai. ' +
-        'Format: https://<resource-name>.openai.azure.com',
+      'Azure OpenAI provider requires an endpoint URL. ' +
+        'Set AZURE_OPENAI_ENDPOINT to your resource URL ' +
+        '(e.g. https://<resource-name>.openai.azure.com).',
     )
   } else {
     try {
       const url = new URL(config.endpoint)
-      if (!url.hostname.includes('openai.azure.com') &&
-          !url.hostname.includes('cognitive.microsoft.com') &&
-          !url.hostname.includes('api.cognitive.microsoft.com')) {
-        // Allow custom endpoints (proxies / sovereign clouds) — only warn.
+      if (
+        !url.hostname.includes('openai.azure.com') &&
+        !url.hostname.includes('cognitive.microsoft.com') &&
+        !url.hostname.includes('api.cognitive.microsoft.com')
+      ) {
         process.stderr.write(
           `[provider] AZURE_OPENAI_ENDPOINT "${config.endpoint}" does not look like a standard ` +
             'Azure OpenAI endpoint. Proceeding, but verify the URL is correct.\n',
         )
       }
     } catch {
-      errors.push(`AZURE_OPENAI_ENDPOINT "${config.endpoint}" is not a valid URL.`)
+      errors.push(
+        `Azure OpenAI endpoint "${config.endpoint}" is not a valid URL. ` +
+          'Set AZURE_OPENAI_ENDPOINT to a valid https:// URL.',
+      )
     }
   }
 
   if (!config.deployment) {
     errors.push(
-      'AZURE_OPENAI_DEPLOYMENT is required when CLAUDE_CODE_PROVIDER=azure-openai. ' +
-        'Set it to your Azure OpenAI deployment name.',
+      'Azure OpenAI provider requires a deployment name. ' +
+        'Set AZURE_OPENAI_DEPLOYMENT to your deployment name in the Azure resource.',
     )
   }
 
   if (!config.apiVersion) {
     errors.push(
-      'AZURE_OPENAI_API_VERSION is required when CLAUDE_CODE_PROVIDER=azure-openai. ' +
-        'Example: "2024-02-01".',
+      'Azure OpenAI provider requires an API version. ' +
+        'Set AZURE_OPENAI_API_VERSION (e.g. "2024-02-01").',
     )
   }
 
   // API key is optional — absence triggers DefaultAzureCredential (Entra ID).
-  // We don't validate that DefaultAzureCredential will succeed here; that
-  // surface is covered at request time.
+  // No error for missing key; the adapter handles credential fallback.
 
   return errors.length === 0 ? { valid: true } : { valid: false, errors }
 }
@@ -204,24 +312,13 @@ function validateAzureOpenAI(
 // Legacy detection helpers
 // ---------------------------------------------------------------------------
 
-/**
- * True when the active provider is any Anthropic-compatible path
- * (firstParty, Bedrock, Vertex, or Foundry).
- */
 export function isAnthropicCompatibleProvider(): boolean {
   const config = getProviderConfig()
   return config.provider === 'claude'
 }
 
-/**
- * True when the active provider supports Anthropic-only session features
- * (remote-control, bridge, OAuth).
- */
 export function isAnthropicOnlyFeaturesAvailable(): boolean {
   return isAnthropicCompatibleProvider()
 }
 
-// ---------------------------------------------------------------------------
-// Re-export for convenience
-// ---------------------------------------------------------------------------
 export { isEnvTruthy }

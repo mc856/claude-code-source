@@ -45,6 +45,10 @@ export class AzureOpenAIAdapter extends OpenAIAdapter {
     })
   }
 
+  protected override get providerName(): string {
+    return 'azure-openai'
+  }
+
   override get baseUrl(): string {
     return this.azureConfig.endpoint.replace(/\/$/, '')
   }

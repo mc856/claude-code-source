@@ -16,6 +16,67 @@ import { logForDebugging } from '../../utils/debug.js'
 import { getProviderConfig, validateProviderConfig } from './config.js'
 import type { ProviderConfig } from './types.js'
 
+// ---------------------------------------------------------------------------
+// Provider-model compatibility
+// ---------------------------------------------------------------------------
+
+/**
+ * Model identifiers and aliases that are specific to the Claude / Anthropic
+ * provider and are not valid on OpenAI-compatible backends.
+ */
+const CLAUDE_SPECIFIC_ALIASES = new Set([
+  'sonnet', 'opus', 'haiku', 'best', 'opusplan',
+  'sonnet[1m]', 'opus[1m]',
+])
+
+/**
+ * Return true when the model string looks like a Claude-specific model
+ * identifier (alias or full Anthropic model ID).
+ */
+function isClaudeSpecificModel(model: string): boolean {
+  const normalized = model.toLowerCase().trim()
+  return (
+    CLAUDE_SPECIFIC_ALIASES.has(normalized) ||
+    normalized.startsWith('claude-') ||
+    // Cross-region Bedrock / Vertex prefixes
+    normalized.startsWith('us.anthropic.') ||
+    normalized.startsWith('eu.anthropic.') ||
+    normalized.startsWith('ap.anthropic.')
+  )
+}
+
+/**
+ * Validate that the given model identifier is compatible with the active
+ * provider.  Returns an array of error strings (empty when valid).
+ *
+ * This is separate from validateProviderConfig so it can be called after
+ * model resolution is complete (e.g. once the --model flag has been parsed).
+ */
+export function validateProviderModelCombination(
+  config: ProviderConfig,
+  model: string,
+): string[] {
+  // Claude provider handles all Claude model identifiers and aliases.
+  if (config.provider === 'claude') return []
+
+  if (isClaudeSpecificModel(model)) {
+    const providerLabel =
+      config.provider === 'openai' ? 'OpenAI' : 'Azure OpenAI'
+    return [
+      `Model "${model}" looks like a Claude-specific model or alias and is ` +
+        `not compatible with the ${providerLabel} provider. ` +
+        `Set a ${providerLabel}-compatible model name instead ` +
+        `(e.g. ${config.provider === 'openai' ? '"gpt-4o" via OPENAI_MODEL' : 'your deployment name via AZURE_OPENAI_DEPLOYMENT'}).`,
+    ]
+  }
+
+  return []
+}
+
+// ---------------------------------------------------------------------------
+// Startup validation
+// ---------------------------------------------------------------------------
+
 /**
  * Validate the active provider configuration and throw if required fields
  * are missing.  Call this during startup / bootstrap — not inside the query
@@ -23,14 +84,26 @@ import type { ProviderConfig } from './types.js'
  *
  * For the "claude" provider this is a no-op (existing auth layers handle it).
  * For "openai" and "azure-openai" this surfaces missing credentials early.
+ *
+ * Pass `model` to also validate provider-model combination compatibility.
  */
-export function assertProviderConfigValid(config?: ProviderConfig): void {
+export function assertProviderConfigValid(
+  config?: ProviderConfig,
+  model?: string,
+): void {
   const resolved = config ?? getProviderConfig()
   const result = validateProviderConfig(resolved)
 
-  if (!result.valid) {
+  const errors: string[] = result.valid ? [] : [...result.errors]
+
+  // Check model compatibility when a specific model target is provided.
+  if (model) {
+    errors.push(...validateProviderModelCombination(resolved, model))
+  }
+
+  if (errors.length > 0) {
     const header = `Provider configuration error (provider: ${resolved.provider}):`
-    const body = result.errors.map(e => `  • ${e}`).join('\n')
+    const body = errors.map(e => `  • ${e}`).join('\n')
     throw new Error(`${header}\n${body}`)
   }
 

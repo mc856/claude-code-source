@@ -1,9 +1,13 @@
 import { feature } from 'bun:bundle'
 import { isBridgeEnabled } from '../../bridge/bridgeEnabled.js'
 import type { Command } from '../../commands.js'
+import { supportsRemoteSession } from '../../services/providers/index.js'
 
 function isEnabled(): boolean {
   if (!feature('BRIDGE_MODE')) {
+    return false
+  }
+  if (!supportsRemoteSession()) {
     return false
   }
   return isBridgeEnabled()

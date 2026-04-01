@@ -116,6 +116,9 @@ async function main(): Promise<void> {
     } = await import('../utils/config.js');
     enableConfigs();
     const {
+      supportsRemoteSession
+    } = await import('../services/providers/index.js');
+    const {
       getBridgeDisabledReason,
       checkBridgeMinVersion
     } = await import('../bridge/bridgeEnabled.js');
@@ -128,6 +131,9 @@ async function main(): Promise<void> {
     const {
       exitWithError
     } = await import('../utils/process.js');
+    if (!supportsRemoteSession()) {
+      exitWithError('Error: Remote Control requires the Claude provider. Set --provider=claude or unset the provider override.');
+    }
 
     // Auth check must come before the GrowthBook gate check — without auth,
     // GrowthBook has no user context and would return a stale/default false.

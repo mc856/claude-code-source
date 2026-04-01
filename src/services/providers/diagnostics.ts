@@ -21,6 +21,8 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
   const limitations: string[] = []
 
   let endpoint: string
+  let resolvedModel: string
+  let credentialSource: string
 
   switch (config.provider) {
     case 'claude': {
@@ -35,6 +37,7 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
             process.env.AWS_DEFAULT_REGION ||
             'us-east-1'
           endpoint = `AWS Bedrock (region: ${region})`
+          credentialSource = 'AWS credentials (IAM / instance profile)'
           break
         }
         case 'vertex': {
@@ -44,6 +47,7 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
             '<project-not-set>'
           const region = process.env.CLOUD_ML_REGION || 'us-east5'
           endpoint = `Google Vertex AI (project: ${project}, region: ${region})`
+          credentialSource = 'Google Cloud credentials (ADC)'
           break
         }
         case 'foundry': {
@@ -52,21 +56,34 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
             process.env.ANTHROPIC_FOUNDRY_BASE_URL ||
             '<resource-not-set>'
           endpoint = `Azure AI Foundry (${resource})`
+          credentialSource = 'Azure AI Foundry credentials'
           break
         }
         default: {
           endpoint = baseUrlOverride
             ? `Anthropic API (${baseUrlOverride})`
             : 'Anthropic API (api.anthropic.com)'
+          credentialSource = process.env.ANTHROPIC_API_KEY
+            ? 'ANTHROPIC_API_KEY'
+            : 'OAuth / keychain'
           break
         }
       }
+
+      // Resolved model: show configured override or indicate runtime resolution.
+      resolvedModel = process.env.ANTHROPIC_MODEL
+        ? `${process.env.ANTHROPIC_MODEL} (ANTHROPIC_MODEL)`
+        : 'resolved at runtime (alias or default)'
       break
     }
 
     case 'openai': {
       const base = config.baseUrl ?? 'https://api.openai.com'
-      endpoint = `OpenAI API (${base}, model: ${config.model})`
+      endpoint = `OpenAI API (${base})`
+      resolvedModel = config.model
+      credentialSource = config.apiKey
+        ? 'OPENAI_API_KEY (set)'
+        : 'OPENAI_API_KEY (missing)'
       if (!capabilities.toolCalls) {
         limitations.push(
           'Tool calling is disabled for this OpenAI runtime; requests will run without tools.',
@@ -93,8 +110,13 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
 
     case 'azure-openai': {
       endpoint =
-        `Azure OpenAI (endpoint: ${config.endpoint}, ` +
-        `deployment: ${config.deployment}, api-version: ${config.apiVersion})`
+        `Azure OpenAI (endpoint: ${config.endpoint}, api-version: ${config.apiVersion})`
+      resolvedModel = config.deployment
+        ? `${config.deployment} (deployment)`
+        : '<deployment not set>'
+      credentialSource = config.apiKey
+        ? 'AZURE_OPENAI_API_KEY (set)'
+        : 'DefaultAzureCredential (Entra ID)'
       if (!capabilities.toolCalls) {
         limitations.push(
           'Tool calling is disabled for this Azure OpenAI deployment/runtime; requests will run without tools.',
@@ -116,10 +138,6 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
             'and are not available with Azure OpenAI.',
         )
       }
-      const authMethod = config.apiKey
-        ? 'API key (AZURE_OPENAI_API_KEY)'
-        : 'DefaultAzureCredential (Entra ID)'
-      limitations.push(`Authentication: ${authMethod}`)
       break
     }
   }
@@ -127,6 +145,8 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
   return {
     provider: config.provider,
     endpoint,
+    resolvedModel,
+    credentialSource,
     capabilities,
     limitations,
   }
@@ -139,6 +159,8 @@ export function formatProviderDiagnostics(diag: ProviderDiagnostics): string {
   const lines: string[] = [
     `Provider: ${diag.provider}`,
     `Endpoint: ${diag.endpoint}`,
+    `Model: ${diag.resolvedModel}`,
+    `Credentials: ${diag.credentialSource}`,
   ]
   if (diag.limitations.length > 0) {
     lines.push('Limitations:')

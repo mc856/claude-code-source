@@ -130,6 +130,18 @@ export type ProviderDiagnostics = {
   provider: ModelProvider
   /** Human-readable endpoint context (base URL, resource name, region, etc.) */
   endpoint: string
+  /**
+   * Resolved model or deployment target that will be sent to the provider.
+   * For Claude, reflects the configured alias or model env var (alias resolution
+   * happens at runtime). For OpenAI/Azure, reflects the fully-qualified
+   * model or deployment name from config.
+   */
+  resolvedModel: string
+  /**
+   * Describes the credential source or auth method in use.
+   * Shows auth state without revealing secrets or token values.
+   */
+  credentialSource: string
   capabilities: ProviderCapabilities
   /** Capability or configuration limitations that affect runtime behavior. */
   limitations: string[]

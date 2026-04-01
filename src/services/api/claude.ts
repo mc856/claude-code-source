@@ -690,6 +690,7 @@ export type Options = {
   enablePromptCaching?: boolean
   skipCacheWrite?: boolean
   temperatureOverride?: number
+  stopSequences?: string[]
   effortValue?: EffortValue
   mcpTools: Tools
   hasPendingMcpServers?: boolean
@@ -721,19 +722,36 @@ export async function queryModelWithoutStreaming({
   signal: AbortSignal
   options: Options
 }): Promise<AssistantMessage> {
+  const { getProviderConfig } = await import('../providers/config.js')
+  const useGenericProviderPath = getProviderConfig().provider !== 'claude'
+
   // Store the assistant message but continue consuming the generator to ensure
   // logAPISuccessAndDuration gets called (which happens after all yields)
   let assistantMessage: AssistantMessage | undefined
-  for await (const message of withStreamingVCR(messages, async function* () {
-    yield* queryModel(
-      messages,
-      systemPrompt,
-      thinkingConfig,
-      tools,
-      signal,
-      options,
-    )
-  })) {
+  const stream = useGenericProviderPath
+    ? withStreamingVCR(messages, async function* () {
+        const { providerCallModel } = await import('../providers/registry.js')
+        yield* providerCallModel({
+          messages,
+          systemPrompt,
+          thinkingConfig,
+          tools,
+          signal,
+          options,
+        })
+      })
+    : withStreamingVCR(messages, async function* () {
+        yield* queryModel(
+          messages,
+          systemPrompt,
+          thinkingConfig,
+          tools,
+          signal,
+          options,
+        )
+      })
+
+  for await (const message of stream) {
     if (message.type === 'assistant') {
       assistantMessage = message
     }

@@ -47,5 +47,9 @@ export {
   assertAnthropicProvider,
 } from './guards.js'
 
-// Startup validation (Task 2.3)
-export { assertProviderConfigValid, getProviderConfigErrors } from './validate.js'
+// Startup validation
+export {
+  assertProviderConfigValid,
+  getProviderConfigErrors,
+  validateProviderModelCombination,
+} from './validate.js'

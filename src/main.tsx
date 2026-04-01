@@ -188,7 +188,7 @@ import { createRemoteSessionConfig } from './remote/RemoteSessionManager.js';
 import { createDirectConnectSession, DirectConnectError } from './server/createDirectConnectSession.js';
 import { initializeLspServerManager } from './services/lsp/manager.js';
 import { shouldEnablePromptSuggestion } from './services/PromptSuggestion/promptSuggestion.js';
-import { assertProviderConfigValid } from './services/providers/index.js';
+import { assertProviderConfigValid, supportsOAuthSession, supportsRemoteSession } from './services/providers/index.js';
 import { type AppState, getDefaultAppState, IDLE_SPECULATION_STATE } from './state/AppStateStore.js';
 import { onChangeAppState } from './state/onChangeAppState.js';
 import { createStore } from './state/store.js';
@@ -991,7 +991,7 @@ async function run(): Promise<CommanderCommand> {
     return Number.isFinite(n) ? n : undefined;
   }).hideHelp()).option('--from-pr [value]', 'Resume a session linked to a PR by PR number/URL, or open interactive picker with optional search term', value => value || true).option('--no-session-persistence', 'Disable session persistence - sessions will not be saved to disk and cannot be resumed (only works with --print)').addOption(new Option('--resume-session-at <message id>', 'When resuming, only messages up to and including the assistant message with <message.id> (use with --resume in print mode)').argParser(String).hideHelp()).addOption(new Option('--rewind-files <user-message-id>', 'Restore files to state at the specified user message and exit (requires --resume)').hideHelp())
   // @[MODEL LAUNCH]: Update the example model ID in the --model help text.
-  .option('--model <model>', `Model for the current session. Provide an alias for the latest model (e.g. 'sonnet' or 'opus') or a model's full name (e.g. 'claude-sonnet-4-6').`).addOption(new Option('--effort <level>', `Effort level for the current session (low, medium, high, max)`).argParser((rawValue: string) => {
+  .addOption(new Option('--provider <provider>', 'Model provider for the current session').choices(['claude', 'openai', 'azure-openai'])).option('--model <model>', `Model for the current session. Provide an alias for the latest model (e.g. 'sonnet' or 'opus') or a model's full name (e.g. 'claude-sonnet-4-6').`).addOption(new Option('--effort <level>', `Effort level for the current session (low, medium, high, max)`).argParser((rawValue: string) => {
     const value = rawValue.toLowerCase();
     const allowed = ['low', 'medium', 'high', 'max'];
     if (!allowed.includes(value)) {
@@ -1529,7 +1529,11 @@ async function run(): Promise<CommanderCommand> {
     };
     // Store the explicit CLI flag so teammates can inherit it
     setChromeFlagOverride(chromeOpts.chrome);
-    const enableClaudeInChrome = shouldEnableClaudeInChrome(chromeOpts.chrome) && ("external" === 'ant' || isClaudeAISubscriber());
+    const chromeRequested = shouldEnableClaudeInChrome(chromeOpts.chrome);
+    if (chromeRequested && !supportsOAuthSession()) {
+      process.stderr.write(chalk.yellow('Claude in Chrome requires the Claude provider.\n--chrome flag ignored.\n'));
+    }
+    const enableClaudeInChrome = chromeRequested && supportsOAuthSession() && ("external" === 'ant' || isClaudeAISubscriber());
     const autoEnableClaudeInChrome = !enableClaudeInChrome && shouldAutoEnableClaudeInChrome();
     if (enableClaudeInChrome) {
       const platform = getPlatform();
@@ -2021,7 +2025,9 @@ async function run(): Promise<CommanderCommand> {
     const userSpecifiedFallbackModel = fallbackModel === 'default' ? getDefaultMainLoopModel() : fallbackModel;
 
     try {
-      assertProviderConfigValid();
+      // Pass the resolved model so provider-model incompatibilities are caught
+      // before the first inference request (e.g. Claude alias with OpenAI provider).
+      assertProviderConfigValid(undefined, userSpecifiedModel ?? undefined);
     } catch (error) {
       process.stderr.write(chalk.red(`${errorMessage(error)}\n`));
       process.exit(1);
@@ -2252,13 +2258,17 @@ async function run(): Promise<CommanderCommand> {
       // Now that trust is established and GrowthBook has auth headers,
       // resolve the --remote-control / --rc entitlement gate.
       if (feature('BRIDGE_MODE') && remoteControlOption !== undefined) {
-        const {
-          getBridgeDisabledReason
-        } = await import('./bridge/bridgeEnabled.js');
-        const disabledReason = await getBridgeDisabledReason();
-        remoteControl = disabledReason === null;
-        if (disabledReason) {
-          process.stderr.write(chalk.yellow(`${disabledReason}\n--rc flag ignored.\n`));
+        if (!supportsRemoteSession()) {
+          process.stderr.write(chalk.yellow('Remote Control requires the Claude provider.\n--rc flag ignored.\n'));
+        } else {
+          const {
+            getBridgeDisabledReason
+          } = await import('./bridge/bridgeEnabled.js');
+          const disabledReason = await getBridgeDisabledReason();
+          remoteControl = disabledReason === null;
+          if (disabledReason) {
+            process.stderr.write(chalk.yellow(`${disabledReason}\n--rc flag ignored.\n`));
+          }
         }
       }
 
@@ -3265,6 +3275,10 @@ async function run(): Promise<CommanderCommand> {
       }, renderAndRun);
       return;
     } else if (feature('KAIROS') && _pendingAssistantChat && (_pendingAssistantChat.sessionId || _pendingAssistantChat.discover)) {
+      if (!supportsRemoteSession()) {
+        return await exitWithError(root, 'Error: Assistant session attach requires the Claude provider. Set --provider=claude or unset the provider override.', () => gracefulShutdown(1));
+      }
+
       // `claude assistant [sessionId]` — REPL as a pure viewer client
       // of a remote assistant session. The agentic loop runs remotely; this
       // process streams live events and POSTs messages. History is lazy-
