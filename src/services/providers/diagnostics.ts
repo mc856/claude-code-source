@@ -67,6 +67,11 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
     case 'openai': {
       const base = config.baseUrl ?? 'https://api.openai.com'
       endpoint = `OpenAI API (${base}, model: ${config.model})`
+      if (!capabilities.toolCalls) {
+        limitations.push(
+          'Tool calling is disabled for this OpenAI runtime; requests will run without tools.',
+        )
+      }
       if (!capabilities.tokenEstimation) {
         limitations.push(
           'Token estimation uses character-based fallback (tiktoken not available).',
@@ -90,6 +95,11 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
       endpoint =
         `Azure OpenAI (endpoint: ${config.endpoint}, ` +
         `deployment: ${config.deployment}, api-version: ${config.apiVersion})`
+      if (!capabilities.toolCalls) {
+        limitations.push(
+          'Tool calling is disabled for this Azure OpenAI deployment/runtime; requests will run without tools.',
+        )
+      }
       if (!capabilities.tokenEstimation) {
         limitations.push(
           'Token estimation uses character-based fallback (tiktoken not available).',

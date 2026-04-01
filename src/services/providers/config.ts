@@ -17,12 +17,14 @@
  *   OPENAI_API_KEY            – required when provider=openai
  *   OPENAI_BASE_URL           – optional base URL override (proxy/compatible endpoint)
  *   OPENAI_MODEL              – model name, e.g. "gpt-4o"
+ *   OPENAI_DISABLE_TOOLS      – optional; disable function/tool calling when set
  *
  * # Azure OpenAI-specific env vars:
  *   AZURE_OPENAI_ENDPOINT     – required, e.g. https://my-resource.openai.azure.com
  *   AZURE_OPENAI_DEPLOYMENT   – required, deployment name
  *   AZURE_OPENAI_API_VERSION  – required, e.g. "2024-02-01"
  *   AZURE_OPENAI_API_KEY      – optional; when absent, DefaultAzureCredential is used
+ *   AZURE_OPENAI_DISABLE_TOOLS – optional; disable function/tool calling when set
  */
 
 import { isEnvTruthy } from '../../utils/envUtils.js'
@@ -86,6 +88,7 @@ function buildOpenAIConfig(): OpenAIProviderConfig {
     apiKey: process.env.OPENAI_API_KEY ?? '',
     baseUrl: process.env.OPENAI_BASE_URL,
     model: process.env.OPENAI_MODEL ?? 'gpt-4o',
+    disableTools: isEnvTruthy(process.env.OPENAI_DISABLE_TOOLS),
   }
 }
 
@@ -96,6 +99,7 @@ function buildAzureOpenAIConfig(): AzureOpenAIProviderConfig {
     deployment: process.env.AZURE_OPENAI_DEPLOYMENT ?? '',
     apiVersion: process.env.AZURE_OPENAI_API_VERSION ?? '2024-02-01',
     apiKey: process.env.AZURE_OPENAI_API_KEY,
+    disableTools: isEnvTruthy(process.env.AZURE_OPENAI_DISABLE_TOOLS),
   }
 }
 

@@ -88,6 +88,8 @@ export type OpenAIProviderConfig = {
   baseUrl?: string
   /** Fully-qualified model identifier (e.g. "gpt-4o"). */
   model: string
+  /** Disable tool calling for runtimes that do not support function calls. */
+  disableTools?: boolean
 }
 
 export type AzureOpenAIProviderConfig = {
@@ -103,6 +105,8 @@ export type AzureOpenAIProviderConfig = {
    * When absent, DefaultAzureCredential is used for Entra ID authentication.
    */
   apiKey?: string
+  /** Disable tool calling for deployments that do not support function calls. */
+  disableTools?: boolean
 }
 
 export type ProviderConfig =

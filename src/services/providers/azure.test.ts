@@ -9,7 +9,7 @@
  * Run with: bun test src/services/providers/azure.test.ts
  */
 
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { AzureOpenAIAdapter } from './azure.js'
 import { validateProviderConfig } from './config.js'
 import { getProviderDiagnostics, formatProviderDiagnostics } from './diagnostics.js'
@@ -63,6 +63,7 @@ function makeUserMessage(text: string) {
 async function collect(
   adapter: AzureOpenAIAdapter,
   fetchImpl: typeof globalThis.fetch,
+  tools: unknown[] = [],
 ): Promise<unknown[]> {
   const origFetch = globalThis.fetch
   globalThis.fetch = fetchImpl
@@ -70,10 +71,10 @@ async function collect(
     const results: unknown[] = []
     const gen = adapter.executeRequest({
       messages: [makeUserMessage('Hello') as never],
-      systemPrompt: [],
-      thinkingConfig: { type: 'disabled' } as never,
-      tools: [] as never,
-      signal: new AbortController().signal,
+        systemPrompt: [],
+        thinkingConfig: { type: 'disabled' } as never,
+        tools: tools as never,
+        signal: new AbortController().signal,
       options: {
         model: BASE_CONFIG.deployment,
         mcpTools: [],
@@ -91,12 +92,44 @@ async function collect(
   }
 }
 
+function getEvents(results: unknown[]): Array<Record<string, unknown>> {
+  return results.filter(
+    (item): item is Record<string, unknown> =>
+      !!item &&
+      typeof item === 'object' &&
+      (item as Record<string, unknown>).type === 'stream_event',
+  )
+}
+
+function getAssistant(results: unknown[]): Record<string, unknown> | undefined {
+  return results.find(
+    (item): item is Record<string, unknown> =>
+      !!item &&
+      typeof item === 'object' &&
+      (item as Record<string, unknown>).type === 'assistant',
+  )
+}
+
+function makeDummyTool() {
+  return {
+    name: 'bash',
+    inputJSONSchema: {
+      type: 'object',
+      properties: {
+        command: { type: 'string' },
+      },
+    },
+    isEnabled: () => true,
+    prompt: async () => 'Run a shell command',
+  }
+}
+
 // ============================================================================
 // 4.1 Successful text generation and streaming flows
 // ============================================================================
 
-describe('4.1 Azure OpenAI — successful streaming flows', () => {
-  it('yields one AssistantMessage with text content from a text streaming response', async () => {
+describe('4.1 Azure OpenAI – successful streaming flows', () => {
+  it('yields normalized stream events plus a final AssistantMessage for text streaming', async () => {
     const adapter = new AzureOpenAIAdapter(BASE_CONFIG)
 
     const textChunk = JSON.stringify({
@@ -123,10 +156,15 @@ describe('4.1 Azure OpenAI — successful streaming flows', () => {
 
     const results = await collect(adapter, fetchMock as never)
 
-    expect(results).toHaveLength(1)
-    const msg = results[0] as Record<string, unknown>
-    expect(msg.type).toBe('assistant')
+    const events = getEvents(results)
+    expect(events.length).toBeGreaterThan(0)
+    expect(events.some(e => e.event && (e.event as Record<string, unknown>).type === 'message_start')).toBe(true)
+    expect(events.some(e => e.event && (e.event as Record<string, unknown>).type === 'content_block_delta')).toBe(true)
+    expect(events.some(e => e.event && (e.event as Record<string, unknown>).type === 'message_delta')).toBe(true)
+    expect(events.some(e => e.event && (e.event as Record<string, unknown>).type === 'message_stop')).toBe(true)
 
+    const msg = getAssistant(results)!
+    expect(msg).toBeTruthy()
     const content = (msg.message as Record<string, unknown>).content as Array<
       Record<string, unknown>
     >
@@ -135,7 +173,7 @@ describe('4.1 Azure OpenAI — successful streaming flows', () => {
     expect(textBlock!.text).toBe('Hello from Azure!')
   })
 
-  it('yields an AssistantMessage with tool_use blocks from a tool-call streaming response', async () => {
+  it('yields tool-call stream events and a final AssistantMessage with tool_use blocks', async () => {
     const adapter = new AzureOpenAIAdapter(BASE_CONFIG)
 
     const chunk1 = JSON.stringify({
@@ -179,9 +217,24 @@ describe('4.1 Azure OpenAI — successful streaming flows', () => {
 
     const results = await collect(adapter, fetchMock as never)
 
-    expect(results).toHaveLength(1)
-    const msg = results[0] as Record<string, unknown>
-    expect(msg.type).toBe('assistant')
+    const events = getEvents(results)
+    expect(
+      events.some(
+        e =>
+          e.event &&
+          (e.event as Record<string, unknown>).type === 'content_block_start',
+      ),
+    ).toBe(true)
+    expect(
+      events.some(
+        e =>
+          e.event &&
+          (e.event as Record<string, unknown>).type === 'content_block_delta',
+      ),
+    ).toBe(true)
+
+    const msg = getAssistant(results)!
+    expect(msg).toBeTruthy()
 
     const content = (msg.message as Record<string, unknown>).content as Array<
       Record<string, unknown>
@@ -190,6 +243,53 @@ describe('4.1 Azure OpenAI — successful streaming flows', () => {
     expect(toolBlock).toBeTruthy()
     expect(toolBlock!.name).toBe('bash')
     expect(toolBlock!.input).toEqual({ command: 'ls -la' })
+  })
+
+  it('falls back to a no-tool request when Azure rejects tool calling', async () => {
+    const adapter = new AzureOpenAIAdapter(BASE_CONFIG)
+    const seenBodies: Array<Record<string, unknown>> = []
+
+    const fetchMock = async (_url: string, init?: RequestInit) => {
+      const parsedBody = JSON.parse(String(init?.body ?? '{}')) as Record<
+        string,
+        unknown
+      >
+      seenBodies.push(parsedBody)
+
+      if (seenBodies.length === 1) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: 'OperationNotSupported',
+              message: 'This deployment does not support tool calling.',
+            },
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+
+      const textChunk = JSON.stringify({
+        id: 'chatcmpl-fallback',
+        choices: [
+          {
+            index: 0,
+            delta: { role: 'assistant', content: 'Fallback without tools' },
+            finish_reason: 'stop',
+          },
+        ],
+      })
+      return new Response(makeSseStream([textChunk, '[DONE]']), {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      })
+    }
+
+    const results = await collect(adapter, fetchMock as never, [makeDummyTool()])
+
+    expect(seenBodies).toHaveLength(2)
+    expect(seenBodies[0]).toHaveProperty('tools')
+    expect(seenBodies[1]).not.toHaveProperty('tools')
+    expect(getAssistant(results)?.type).toBe('assistant')
   })
 
   it('sends the request to the Azure deployment-aware endpoint URL', async () => {
@@ -419,6 +519,14 @@ describe('4.3 Azure OpenAI — capability reporting', () => {
     expect(adapter.capabilities.toolCalls).toBe(true)
   })
 
+  it('declares toolCalls as unsupported when explicitly disabled', () => {
+    const adapter = new AzureOpenAIAdapter({
+      ...BASE_CONFIG,
+      disableTools: true,
+    })
+    expect(adapter.capabilities.toolCalls).toBe(false)
+  })
+
   it('declares tokenEstimation as unsupported (character-based fallback)', () => {
     const adapter = new AzureOpenAIAdapter(BASE_CONFIG)
     expect(adapter.capabilities.tokenEstimation).toBe(false)
@@ -501,6 +609,16 @@ describe('4.3 Azure OpenAI — capability reporting', () => {
         l.toLowerCase().includes('alias'),
       )
       expect(aliasLimitation).toBeTruthy()
+    })
+
+    it('lists tool-calling limitation when explicitly disabled', () => {
+      process.env.AZURE_OPENAI_DISABLE_TOOLS = '1'
+      const diag = getProviderDiagnostics()
+      expect(diag.capabilities.toolCalls).toBe(false)
+      const toolLimitation = diag.limitations.find(l =>
+        l.toLowerCase().includes('tool calling is disabled'),
+      )
+      expect(toolLimitation).toBeTruthy()
     })
 
     it('reports Entra ID auth when no API key is configured', () => {

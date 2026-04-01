@@ -31,7 +31,6 @@ const AZURE_OPENAI_CAPABILITIES: ProviderCapabilities = {
 }
 
 export class AzureOpenAIAdapter extends OpenAIAdapter {
-  override readonly capabilities = AZURE_OPENAI_CAPABILITIES
   private azureADTokenProviderPromise?:
     | Promise<() => Promise<string>>
     | undefined
@@ -56,6 +55,17 @@ export class AzureOpenAIAdapter extends OpenAIAdapter {
 
   override get apiKey(): string {
     return this.azureConfig.apiKey ?? ''
+  }
+
+  override get capabilities(): ProviderCapabilities {
+    return {
+      ...AZURE_OPENAI_CAPABILITIES,
+      toolCalls: !this.azureConfig.disableTools,
+    }
+  }
+
+  override get toolsEnabled(): boolean {
+    return !this.azureConfig.disableTools
   }
 
   /**

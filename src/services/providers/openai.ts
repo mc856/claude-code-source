@@ -34,7 +34,12 @@ import type { ThinkingConfig } from '../../utils/thinking.js'
 import type { Options } from '../api/claude.js'
 import { createAssistantMessage } from '../../utils/messages.js'
 import type { ProviderAdapter, ProviderExecuteRequest } from './adapter.js'
-import type { OpenAIProviderConfig, ProviderCapabilities } from './types.js'
+import type {
+  OpenAIProviderConfig,
+  ProviderCapabilities,
+  ProviderError,
+  ProviderErrorCategory,
+} from './types.js'
 
 // ---------------------------------------------------------------------------
 // Capabilities
@@ -105,6 +110,19 @@ type OpenAIStreamChunk = {
     completion_tokens: number
     total_tokens: number
   }
+}
+
+type OpenAIErrorBody = {
+  error?: {
+    message?: string
+    code?: string
+    type?: string
+  }
+}
+
+type ToolFallbackContext = {
+  enabled: boolean
+  attempted: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -346,6 +364,91 @@ function makeUsage(
   } as unknown as Usage
 }
 
+function mapFinishReason(
+  finishReason: string | null,
+): 'end_turn' | 'tool_use' | 'max_tokens' | null {
+  switch (finishReason) {
+    case 'stop':
+      return 'end_turn'
+    case 'tool_calls':
+      return 'tool_use'
+    case 'length':
+      return 'max_tokens'
+    default:
+      return null
+  }
+}
+
+function categoryForStatus(
+  status: number,
+  body?: OpenAIErrorBody,
+): ProviderErrorCategory {
+  if (status === 401 || status === 403) return 'auth'
+  if (status === 429) return 'quota'
+
+  const code = body?.error?.code?.toLowerCase() ?? ''
+  const message = body?.error?.message?.toLowerCase() ?? ''
+  if (
+    status === 400 &&
+    (code.includes('deploymentnotfound') ||
+      code.includes('model_not_found') ||
+      message.includes('deployment') ||
+      message.includes('model') ||
+      message.includes('api version') ||
+      message.includes('api-version'))
+  ) {
+    return 'config'
+  }
+
+  if (status >= 400 && status < 500) return 'protocol'
+  return 'unknown'
+}
+
+function isToolUnsupportedError(
+  status: number,
+  body?: OpenAIErrorBody,
+): boolean {
+  if (status < 400 || status >= 500) return false
+  const code = body?.error?.code?.toLowerCase() ?? ''
+  const type = body?.error?.type?.toLowerCase() ?? ''
+  const message = body?.error?.message?.toLowerCase() ?? ''
+  return (
+    code.includes('tool') ||
+    code.includes('function') ||
+    type.includes('tool') ||
+    type.includes('function') ||
+    message.includes('tool calling') ||
+    message.includes('tool_calls') ||
+    message.includes('tools are not supported') ||
+    message.includes('functions are not supported') ||
+    message.includes('does not support tools') ||
+    message.includes('does not support function')
+  )
+}
+
+function toProviderErrorFromHttp(
+  status: number,
+  bodyText: string,
+  body?: OpenAIErrorBody,
+): ProviderError {
+  const message =
+    body?.error?.message?.trim() || bodyText.trim() || `OpenAI HTTP ${status}`
+  return {
+    category: categoryForStatus(status, body),
+    message,
+    retryable: status === 429 || status >= 500,
+  }
+}
+
+function toProviderErrorFromNetwork(error: unknown): ProviderError {
+  return {
+    category: 'unknown',
+    message: error instanceof Error ? error.message : String(error),
+    retryable: true,
+    originalError: error,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // HTTP helpers
 // ---------------------------------------------------------------------------
@@ -363,9 +466,14 @@ function buildHeaders(apiKey: string): Record<string, string> {
 // ---------------------------------------------------------------------------
 
 export class OpenAIAdapter implements ProviderAdapter {
-  readonly capabilities = OPENAI_CAPABILITIES
-
   constructor(protected readonly config: OpenAIProviderConfig) {}
+
+  get capabilities(): ProviderCapabilities {
+    return {
+      ...OPENAI_CAPABILITIES,
+      toolCalls: !this.config.disableTools,
+    }
+  }
 
   protected get baseUrl(): string {
     return (this.config.baseUrl ?? 'https://api.openai.com').replace(/\/$/, '')
@@ -377,6 +485,10 @@ export class OpenAIAdapter implements ProviderAdapter {
 
   protected get apiKey(): string {
     return this.config.apiKey
+  }
+
+  protected get toolsEnabled(): boolean {
+    return !this.config.disableTools
   }
 
   protected async getHeaders(): Promise<Record<string, string>> {
@@ -401,7 +513,17 @@ export class OpenAIAdapter implements ProviderAdapter {
     signal: AbortSignal
     options: Options
   }) => {
-    return this._stream({ messages, systemPrompt, tools, signal, options })
+    return this._stream({
+      messages,
+      systemPrompt,
+      tools,
+      signal,
+      options,
+      toolFallback: {
+        enabled: this.toolsEnabled,
+        attempted: false,
+      },
+    })
   }
 
   protected async *_stream({
@@ -410,18 +532,22 @@ export class OpenAIAdapter implements ProviderAdapter {
     tools,
     signal,
     options,
+    toolFallback,
   }: {
     messages: Message[]
     systemPrompt: SystemPrompt
     tools: Tools
     signal: AbortSignal
     options: Options
+    toolFallback: ToolFallbackContext
   }): AsyncGenerator<StreamEvent | AssistantMessage | SystemAPIErrorMessage> {
     // Convert internal messages and tools to OpenAI format
     const openaiMessages = toOpenAIMessages(messages, systemPrompt)
     const allTools = [...tools, ...options.mcpTools]
     const openaiTools =
-      allTools.length > 0 ? await toOpenAITools(allTools, options) : undefined
+      toolFallback.enabled && allTools.length > 0
+        ? await toOpenAITools(allTools, options)
+        : undefined
 
     const body: Record<string, unknown> = {
       model: options.model || this.model,
@@ -452,18 +578,60 @@ export class OpenAIAdapter implements ProviderAdapter {
     }
 
     if (!response.ok) {
-      yield* this._yieldHttpError(response)
+      const httpError = await this.readHttpError(response)
+      if (
+        toolFallback.enabled &&
+        !toolFallback.attempted &&
+        openaiTools &&
+        isToolUnsupportedError(response.status, httpError.body)
+      ) {
+        yield* this._stream({
+          messages,
+          systemPrompt,
+          tools,
+          signal,
+          options,
+          toolFallback: {
+            enabled: false,
+            attempted: true,
+          },
+        })
+        return
+      }
+      yield* this._yieldProviderError(httpError.providerError, response.status)
       return
     }
 
     // Accumulate streaming response
+    const messageId = randomUUID()
+    const modelName = String(body.model)
     let textAccumulator = ''
     const toolCallAccumulators: Map<
       number,
       { id: string; name: string; arguments: string }
     > = new Map()
+    const startedToolBlocks = new Set<number>()
+    let startedTextBlock = false
     let promptTokens = 0
     let completionTokens = 0
+    let finishReason: string | null = null
+
+    yield {
+      type: 'stream_event',
+      event: {
+        type: 'message_start',
+        message: {
+          id: messageId,
+          type: 'message',
+          role: 'assistant',
+          model: modelName,
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: makeUsage(0, 0),
+        },
+      } as StreamEvent['event'],
+    }
 
     try {
       for await (const chunk of parseSSE(response)) {
@@ -477,16 +645,45 @@ export class OpenAIAdapter implements ProviderAdapter {
 
         for (const choice of chunk.choices) {
           const delta = choice.delta
+          if (choice.finish_reason) {
+            finishReason = choice.finish_reason
+          }
 
           // Accumulate text content
           if (delta.content) {
+            if (!startedTextBlock) {
+              startedTextBlock = true
+              yield {
+                type: 'stream_event',
+                event: {
+                  type: 'content_block_start',
+                  index: 0,
+                  content_block: {
+                    type: 'text',
+                    text: '',
+                  },
+                } as StreamEvent['event'],
+              }
+            }
             textAccumulator += delta.content
+            yield {
+              type: 'stream_event',
+              event: {
+                type: 'content_block_delta',
+                index: 0,
+                delta: {
+                  type: 'text_delta',
+                  text: delta.content,
+                },
+              } as StreamEvent['event'],
+            }
           }
 
           // Accumulate tool call deltas
           if (delta.tool_calls) {
             for (const tc of delta.tool_calls) {
               const idx = tc.index
+              const blockIndex = idx + 1
               if (!toolCallAccumulators.has(idx)) {
                 toolCallAccumulators.set(idx, {
                   id: tc.id ?? randomUUID(),
@@ -495,16 +692,66 @@ export class OpenAIAdapter implements ProviderAdapter {
                 })
               }
               const acc = toolCallAccumulators.get(idx)!
+              if (!startedToolBlocks.has(idx)) {
+                startedToolBlocks.add(idx)
+                yield {
+                  type: 'stream_event',
+                  event: {
+                    type: 'content_block_start',
+                    index: blockIndex,
+                    content_block: {
+                      type: 'tool_use',
+                      id: acc.id,
+                      name: acc.name,
+                      input: '',
+                    },
+                  } as StreamEvent['event'],
+                }
+              }
               if (tc.id && !acc.id) acc.id = tc.id
-              if (tc.function?.name) acc.name += tc.function.name
-              if (tc.function?.arguments) acc.arguments += tc.function.arguments
+              if (tc.function?.name) {
+                acc.name += tc.function.name
+              }
+              if (tc.function?.arguments) {
+                acc.arguments += tc.function.arguments
+                yield {
+                  type: 'stream_event',
+                  event: {
+                    type: 'content_block_delta',
+                    index: blockIndex,
+                    delta: {
+                      type: 'input_json_delta',
+                      partial_json: tc.function.arguments,
+                    },
+                  } as StreamEvent['event'],
+                }
+              }
             }
           }
         }
       }
     } catch (streamError) {
-      yield* this._yieldNetworkError(streamError)
+      yield* this._yieldProviderError(toProviderErrorFromNetwork(streamError), 0)
       return
+    }
+
+    if (startedTextBlock) {
+      yield {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_stop',
+          index: 0,
+        } as StreamEvent['event'],
+      }
+    }
+    for (const idx of startedToolBlocks) {
+      yield {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_stop',
+          index: idx + 1,
+        } as StreamEvent['event'],
+      }
     }
 
     // Build content blocks in internal format
@@ -534,38 +781,72 @@ export class OpenAIAdapter implements ProviderAdapter {
     }
 
     const usage = makeUsage(promptTokens, completionTokens)
+    yield {
+      type: 'stream_event',
+      event: {
+        type: 'message_delta',
+        delta: {
+          stop_reason: mapFinishReason(finishReason),
+          stop_sequence: null,
+        },
+        usage,
+      } as StreamEvent['event'],
+    }
+    yield {
+      type: 'stream_event',
+      event: {
+        type: 'message_stop',
+      } as StreamEvent['event'],
+    }
     const assistantMessage = createAssistantMessage({ content: contentBlocks, usage })
     yield assistantMessage
   }
 
-  protected async *_yieldNetworkError(
-    error: unknown,
-  ): AsyncGenerator<SystemAPIErrorMessage> {
-    const { APIConnectionError } = await import('@anthropic-ai/sdk')
-    const wrapped = new APIConnectionError({
-      message: `OpenAI network error: ${error instanceof Error ? error.message : String(error)}`,
-    })
-    const { createSystemAPIErrorMessage } = await import('../../utils/messages.js')
-    yield createSystemAPIErrorMessage(wrapped, 0, 0, 0)
-  }
-
-  protected async *_yieldHttpError(
-    response: Response,
-  ): AsyncGenerator<SystemAPIErrorMessage> {
-    let body = ''
+  protected async readHttpError(response: Response): Promise<{
+    bodyText: string
+    body?: OpenAIErrorBody
+    providerError: ProviderError
+  }> {
+    let bodyText = ''
     try {
-      body = await response.text()
+      bodyText = await response.text()
     } catch {
       // ignore
     }
-    const { APIError } = await import('@anthropic-ai/sdk')
-    const apiErr = APIError.generate(
-      response.status,
-      { error: { message: body } },
-      `OpenAI HTTP ${response.status}`,
-      response.headers as unknown as Headers,
-    )
+
+    let parsedBody: OpenAIErrorBody | undefined
+    try {
+      parsedBody = bodyText ? (JSON.parse(bodyText) as OpenAIErrorBody) : undefined
+    } catch {
+      // ignore malformed JSON bodies
+    }
+
+    return {
+      bodyText,
+      body: parsedBody,
+      providerError: toProviderErrorFromHttp(response.status, bodyText, parsedBody),
+    }
+  }
+
+  protected async *_yieldProviderError(
+    providerError: ProviderError,
+    status: number,
+  ): AsyncGenerator<SystemAPIErrorMessage> {
+    const { APIError, APIConnectionError } = await import('@anthropic-ai/sdk')
+    let wrapped
+    if (status === 0) {
+      wrapped = new APIConnectionError({
+        message: `OpenAI network error: ${providerError.message}`,
+      })
+    } else {
+      wrapped = APIError.generate(
+        status,
+        { error: { message: providerError.message } },
+        `OpenAI ${providerError.category} error`,
+        {} as Headers,
+      )
+    }
     const { createSystemAPIErrorMessage } = await import('../../utils/messages.js')
-    yield createSystemAPIErrorMessage(apiErr, 0, 0, 0)
+    yield createSystemAPIErrorMessage(wrapped, 0, 0, 0)
   }
 }
