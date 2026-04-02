@@ -985,3 +985,109 @@ None for `provider-selection-ux` tasks. All 12 tasks marked complete.
 Broader follow-up from earlier changes that remains open:
 - automated validation of provider tests in an environment with `bun` available
 - Anthropic-only feature entry-point audit (beyond the highest-visibility entry points already gated)
+
+## 2026-04-02 Debug Record: Final Provider Review Remediation
+
+### Symptom
+
+Final review identified two remaining closure issues after the three provider-related changes had been marked complete:
+- non-Claude providers still passed model/deployment values through the existing global `availableModels` allowlist path, which is Claude-oriented and can reject valid Azure deployment names
+- `provider-abstraction` claimed OpenAI-compatible validation completion, but the repository still lacked a focused `OpenAIAdapter` test file covering direct OpenAI request construction and fallback behavior
+
+### Root Cause
+
+The allowlist logic in `src/utils/model/modelAllowlist.ts` still applied Claude-family alias and version-prefix semantics generically, regardless of active provider.
+
+At the same time, existing automated coverage validated Azure OpenAI and provider-selection behavior, but not the OpenAI adapter directly.
+
+### Decision
+
+Keep the existing enterprise `availableModels` restriction, but make its interpretation provider-aware:
+- `claude` keeps the current alias/family/version-prefix semantics
+- `openai` and `azure-openai` use exact-match allowlist behavior so provider-native model IDs or deployment names are not filtered through Claude-oriented alias rules
+
+Also close the validation gap by adding a focused OpenAI adapter test file instead of treating Azure coverage as a sufficient proxy.
+
+### Fix
+
+The remediation pass implemented the following:
+- added `isModelAllowedForProvider()` in `src/utils/model/modelAllowlist.ts`
+- changed non-Claude allowlist behavior to exact-match against configured values instead of Claude alias/family expansion
+- updated `validateModel()` to call provider-aware allowlist logic before provider-specific compatibility checks
+- updated the `/model` command path to use provider-aware allowlist checks before validating and applying a model override
+- added `src/services/providers/openai.test.ts` with focused coverage for:
+  - configured base URL handling
+  - bearer authentication headers
+  - normalized streaming event emission
+  - tool-calling rejection fallback to a no-tool retry
+  - network-error normalization into `SystemAPIErrorMessage`
+  - capability reporting when tools are disabled
+
+### Verification
+
+Executed automated tests:
+- `bun test src/services/providers/openai.test.ts`
+- `bun test src/services/providers/azure.test.ts`
+- `bun test src/services/providers/provider-selection.test.ts`
+- `bun test src/cli/handlers/auth.test.ts`
+- combined run: `bun test src/services/providers/openai.test.ts src/services/providers/azure.test.ts src/services/providers/provider-selection.test.ts src/cli/handlers/auth.test.ts`
+
+Observed result:
+- 42 passing tests
+- 0 failures
+
+Executed TypeScript validation:
+- `bunx --bun tsc --noEmit -p tsconfig.json`
+  - failed immediately on `tsconfig.json` deprecation gating under TypeScript 6: `baseUrl` now requires explicit deprecation acknowledgement
+- `bunx --bun tsc --noEmit -p tsconfig.json --ignoreDeprecations 6.0`
+  - still failed due to broad repository baseline issues unrelated to this remediation pass, including missing global types, missing declaration files, missing runtime type packages, and existing compile errors outside the provider files touched here
+
+### Current Assessment
+
+After this remediation pass:
+- the provider/model allowlist path is aligned with provider-aware model/deployment semantics
+- OpenAI adapter behavior now has direct automated coverage alongside the existing Azure and provider-selection suites
+- provider-focused automated validation is materially stronger than in the prior review state
+
+TypeScript no-emit remains a repository-level baseline issue rather than a newly introduced failure from this change.
+
+## 2026-04-02 Debug Record: Anthropic-Compatible Validation Closure
+
+### Symptom
+
+After the final remediation pass, `provider-abstraction/tasks.md` item `2.3` still remained open because there was no focused automated validation proving that the adapter refactor had preserved Anthropic-compatible provider routing.
+
+### Decision
+
+Use a narrow regression suite for the Claude adapter boundary rather than attempting live credential-backed requests:
+- verify that legacy Bedrock / Vertex / Foundry env selections still resolve through the Claude adapter path
+- verify that the Claude adapter still exposes Anthropic-only capabilities
+- verify that the adapter remains a direct passthrough to `queryModelWithStreaming`, which is the intended zero-behavior-change contract for existing Anthropic-compatible providers
+
+This closes the adapter-refactor validation gap without introducing brittle credential-dependent tests.
+
+### Fix
+
+Added `src/services/providers/claude.test.ts` covering:
+- default `firstParty` provider resolution
+- legacy `CLAUDE_CODE_USE_BEDROCK`
+- legacy `CLAUDE_CODE_USE_VERTEX`
+- legacy `CLAUDE_CODE_USE_FOUNDRY`
+- Claude adapter capability flags
+- direct `executeRequest === queryModelWithStreaming` passthrough verification
+
+### Verification
+
+Executed automated tests:
+- `bun test src/services/providers/claude.test.ts`
+- `bun test src/services/providers/claude.test.ts src/services/providers/openai.test.ts src/services/providers/azure.test.ts src/services/providers/provider-selection.test.ts src/cli/handlers/auth.test.ts`
+
+Observed result:
+- 45 passing tests
+- 0 failures
+
+### Current Assessment
+
+With the Claude adapter regression suite now present, the focused validation requirement for Anthropic-compatible providers is sufficiently covered for the adapter refactor scope.
+
+`provider-abstraction/tasks.md` item `2.3` is now aligned with the executed validation state.

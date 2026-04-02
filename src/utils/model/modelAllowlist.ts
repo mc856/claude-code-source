@@ -1,4 +1,5 @@
 import { getSettings_DEPRECATED } from '../settings/settings.js'
+import { getProviderConfig } from '../../services/providers/config.js'
 import { isModelAlias, isModelFamilyAlias } from './aliases.js'
 import { parseUserSpecifiedModel } from './model.js'
 import { resolveOverriddenModel } from './modelStrings.js'
@@ -97,7 +98,10 @@ function familyHasSpecificEntries(
  * 2. Version prefixes ("opus-4-5", "claude-opus-4-5") — any build of that version
  * 3. Full model IDs ("claude-opus-4-5-20251101") — exact match only
  */
-export function isModelAllowed(model: string): boolean {
+export function isModelAllowedForProvider(
+  model: string,
+  provider = getProviderConfig().provider,
+): boolean {
   const settings = getSettings_DEPRECATED() || {}
   const { availableModels } = settings
   if (!availableModels) {
@@ -105,6 +109,12 @@ export function isModelAllowed(model: string): boolean {
   }
   if (availableModels.length === 0) {
     return false // Empty allowlist blocks all user-specified models
+  }
+
+  if (provider !== 'claude') {
+    const normalizedModel = model.trim().toLowerCase()
+    const normalizedAllowlist = availableModels.map(m => m.trim().toLowerCase())
+    return normalizedAllowlist.includes(normalizedModel)
   }
 
   const resolvedModel = resolveOverriddenModel(model)
@@ -167,4 +177,8 @@ export function isModelAllowed(model: string): boolean {
   }
 
   return false
+}
+
+export function isModelAllowed(model: string): boolean {
+  return isModelAllowedForProvider(model)
 }

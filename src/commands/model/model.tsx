@@ -13,7 +13,7 @@ import { clearFastModeCooldown, isFastModeAvailable, isFastModeEnabled, isFastMo
 import { MODEL_ALIASES } from '../../utils/model/aliases.js';
 import { checkOpus1mAccess, checkSonnet1mAccess } from '../../utils/model/check1mAccess.js';
 import { getDefaultMainLoopModelSetting, isOpus1mMergeEnabled, renderDefaultModelSetting } from '../../utils/model/model.js';
-import { isModelAllowed } from '../../utils/model/modelAllowlist.js';
+import { isModelAllowedForProvider } from '../../utils/model/modelAllowlist.js';
 import { getProviderConfig } from '../../services/providers/config.js';
 import { validateModel } from '../../utils/model/validateModel.js';
 function ModelPickerWrapper(t0) {
@@ -142,7 +142,10 @@ function SetModelAndClose({
   const model = args === 'default' ? null : args;
   React.useEffect(() => {
     async function handleModelChange(): Promise<void> {
-      if (model && !isModelAllowed(model)) {
+      if (
+        model &&
+        !isModelAllowedForProvider(model, getProviderConfig().provider)
+      ) {
         onDone(`Model '${model}' is not available. Your organization restricts model selection.`, {
           display: 'system'
         });

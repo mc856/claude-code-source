@@ -1,6 +1,6 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { MODEL_ALIASES } from './aliases.js'
-import { isModelAllowed } from './modelAllowlist.js'
+import { isModelAllowedForProvider } from './modelAllowlist.js'
 import { getAPIProvider } from './providers.js'
 import { getProviderConfig, validateProviderConfig } from '../../services/providers/config.js'
 import { validateProviderModelCombination } from '../../services/providers/validate.js'
@@ -32,7 +32,7 @@ export async function validateModel(
   }
 
   // Check against availableModels allowlist before any API call
-  if (!isModelAllowed(normalizedModel)) {
+  if (!isModelAllowedForProvider(normalizedModel, providerConfig.provider)) {
     return {
       valid: false,
       error: `Model '${normalizedModel}' is not in the list of available models`,
