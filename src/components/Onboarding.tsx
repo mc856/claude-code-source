@@ -211,7 +211,7 @@ export function Onboarding({
       </Box>
     </Box>;
 }
-export function SkippableStep(t0) {
+export function SkippableStep(t0: Props) {
   const $ = _c(4);
   const {
     skip,

@@ -10,13 +10,17 @@ type Props = {
   progress: ShellProgress | null;
   verbose: boolean;
 };
-export function BashModeProgress(t0) {
+export function BashModeProgress(t0: Props) {
   const $ = _c(8);
   const {
     input,
     progress,
     verbose
   } = t0;
+  const progressFullOutput = progress?.fullOutput ?? "";
+  const progressOutput = progress?.output ?? "";
+  const progressElapsedTimeSeconds = progress?.elapsedTimeSeconds;
+  const progressTotalLines = progress?.totalLines;
   const t1 = `<bash-input>${input}</bash-input>`;
   let t2;
   if ($[0] !== t1) {
@@ -29,13 +33,13 @@ export function BashModeProgress(t0) {
   } else {
     t2 = $[1];
   }
-  let t3;
+  let t3: React.ReactNode;
   if ($[2] !== progress || $[3] !== verbose) {
-    t3 = progress ? <ShellProgressMessage fullOutput={progress.fullOutput} output={progress.output} elapsedTimeSeconds={progress.elapsedTimeSeconds} totalLines={progress.totalLines} verbose={verbose} /> : BashTool.renderToolUseProgressMessage?.([], {
+    t3 = progress ? <ShellProgressMessage fullOutput={progressFullOutput} output={progressOutput} elapsedTimeSeconds={progressElapsedTimeSeconds} totalLines={progressTotalLines} verbose={verbose} /> : BashTool.renderToolUseProgressMessage?.([], {
       verbose,
       tools: [],
       terminalSize: undefined
-    });
+    }) ?? null;
     $[2] = progress;
     $[3] = verbose;
     $[4] = t3;

@@ -13,14 +13,14 @@ const MAX_IMPRESSIONS = 3;
  * Whether to show the overage credit upsell on any surface.
  *
  * Eligibility comes entirely from the backend GET /overage_credit_grant
- * response â€” the CLI doesn't replicate tier/threshold/role checks. The
+ * response â€?the CLI doesn't replicate tier/threshold/role checks. The
  * backend returns available: false for Team members who aren't admins,
  * so they don't see an upsell they can't act on.
  *
- * isEligibleForOverageCreditGrant â€” just the backend eligibility. Use for
+ * isEligibleForOverageCreditGrant â€?just the backend eligibility. Use for
  *   persistent reference surfaces (/usage) where the info should show
  *   whenever eligible, no impression cap.
- * shouldShowOverageCreditUpsell â€” adds the 3-impression cap and
+ * shouldShowOverageCreditUpsell â€?adds the 3-impression cap and
  *   hasVisitedExtraUsage dismiss. Use for promotional surfaces
  *   (welcome feed, tips).
  */
@@ -39,7 +39,7 @@ export function shouldShowOverageCreditUpsell(): boolean {
 
 /**
  * Kick off a background fetch if the cache is empty. Safe to call
- * unconditionally on mount â€” it no-ops if cache is fresh.
+ * unconditionally on mount â€?it no-ops if cache is fresh.
  */
 export function maybeRefreshOverageCreditCache(): void {
   if (getCachedOverageCreditGrant() !== null) return;
@@ -67,13 +67,13 @@ export function incrementOverageCreditUpsellSeenCount(): void {
   });
 }
 
-// Copy from "OC & Bulk Overages copy" doc (#6 â€” CLI /usage)
+// Copy from "OC & Bulk Overages copy" doc (#6 â€?CLI /usage)
 function getUsageText(amount: string): string {
   return `${amount} in extra usage for third-party apps Â· /extra-usage`;
 }
 
-// Copy from "OC & Bulk Overages copy" doc (#4 â€” CLI Welcome screen).
-// Char budgets: title â‰¤19, subtitle â‰¤48.
+// Copy from "OC & Bulk Overages copy" doc (#4 â€?CLI Welcome screen).
+// Char budgets: title â‰?9, subtitle â‰?8.
 const FEED_SUBTITLE = 'On us. Works on third-party apps Â· /extra-usage';
 function getFeedTitle(amount: string): string {
   return `${amount} in extra usage`;
@@ -82,7 +82,7 @@ type Props = {
   maxWidth?: number;
   twoLine?: boolean;
 };
-export function OverageCreditUpsell(t0) {
+export function OverageCreditUpsell(t0: Props) {
   const $ = _c(8);
   const {
     maxWidth,
@@ -147,8 +147,8 @@ export function OverageCreditUpsell(t0) {
  * Feed config for the homescreen rotating feed. Mirrors
  * createGuestPassesFeed in feedConfigs.tsx.
  *
- * Copy from "OC & Bulk Overages copy" doc (#4 â€” CLI Welcome screen).
- * Char budgets: title â‰¤19, subtitle â‰¤48.
+ * Copy from "OC & Bulk Overages copy" doc (#4 â€?CLI Welcome screen).
+ * Char budgets: title â‰?9, subtitle â‰?8.
  */
 export function createOverageCreditFeed(): FeedConfig {
   const info = getCachedOverageCreditGrant();

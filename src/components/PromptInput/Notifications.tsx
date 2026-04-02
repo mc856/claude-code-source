@@ -52,7 +52,7 @@ type Props = {
   isInputWrapped?: boolean;
   isNarrow?: boolean;
 };
-export function Notifications(t0) {
+export function Notifications(t0: Props) {
   const $ = _c(34);
   const {
     apiKeyStatus,
@@ -252,7 +252,7 @@ function NotificationContent({
   onChangeIsUpdating: (isUpdating: boolean) => void;
 }): ReactNode {
   // Poll apiKeyHelper inflight state to show slow-helper notice.
-  // Gated on configuration â€” most users never set apiKeyHelper, so the
+  // Gated on configuration â€?most users never set apiKeyHelper, so the
   // effect is a no-op for them (no interval allocated).
   const [apiKeyHelperSlow, setApiKeyHelperSlow] = useState<string | null>(null);
   useEffect(() => {

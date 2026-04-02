@@ -1,5 +1,6 @@
 import { c as _c } from "react/compiler-runtime";
 import React from 'react';
+import { type GlobalConfig } from '../utils/config.js';
 import { logEvent } from 'src/services/analytics/index.js';
 // eslint-disable-next-line custom-rules/prefer-use-keybindings -- enter to continue
 import { Box, Link, Newline, Text, useInput } from '../ink.js';
@@ -11,7 +12,7 @@ const CHROME_PERMISSIONS_URL = 'https://clau.de/chrome/permissions';
 type Props = {
   onDone(): void;
 };
-export function ClaudeInChromeOnboarding(t0) {
+export function ClaudeInChromeOnboarding(t0: Props) {
   const $ = _c(20);
   const {
     onDone
@@ -25,7 +26,7 @@ export function ClaudeInChromeOnboarding(t0) {
       isChromeExtensionInstalled().then(setIsExtensionInstalled);
       saveGlobalConfig(_temp);
     };
-    t2 = [];
+    t2 = [] as const;
     $[0] = t1;
     $[1] = t2;
   } else {
@@ -35,7 +36,7 @@ export function ClaudeInChromeOnboarding(t0) {
   React.useEffect(t1, t2);
   let t3;
   if ($[2] !== onDone) {
-    t3 = (_input, key) => {
+    t3 = (_input: string, key: { return?: boolean }) => {
       if (key.return) {
         onDone();
       }
@@ -112,7 +113,7 @@ export function ClaudeInChromeOnboarding(t0) {
   }
   return t11;
 }
-function _temp(current) {
+function _temp(current: GlobalConfig) {
   return {
     ...current,
     hasCompletedClaudeInChromeOnboarding: true

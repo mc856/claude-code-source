@@ -339,7 +339,7 @@ function _temp3(dir, index_0) {
 function _temp2(rule, index) {
   return <Text key={index}>{figures.bullet} {permissionRuleValueToString(rule)}</Text>;
 }
-export function PermissionDecisionDebugInfo(t0) {
+export function PermissionDecisionDebugInfo(t0: Props) {
   const $ = _c(25);
   const {
     permissionResult,

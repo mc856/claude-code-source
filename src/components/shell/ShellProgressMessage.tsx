@@ -16,7 +16,7 @@ type Props = {
   taskId?: string;
   verbose: boolean;
 };
-export function ShellProgressMessage(t0) {
+export function ShellProgressMessage(t0: Props) {
   const $ = _c(30);
   const {
     output,
@@ -55,7 +55,7 @@ export function ShellProgressMessage(t0) {
   if (!lines.length) {
     let t3;
     if ($[7] === Symbol.for("react.memo_cache_sentinel")) {
-      t3 = <Text dimColor={true}>Runningâ€¦ </Text>;
+      t3 = <Text dimColor={true}>Runningâ€?</Text>;
       $[7] = t3;
     } else {
       t3 = $[7];

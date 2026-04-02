@@ -21,7 +21,7 @@ type Props = {
   style?: 'condensed';
   verbose: boolean;
 };
-export function FileEditToolUseRejectedMessage(t0) {
+export function FileEditToolUseRejectedMessage(t0: Props) {
   const $ = _c(38);
   const {
     file_path,
@@ -113,7 +113,7 @@ export function FileEditToolUseRejectedMessage(t0) {
     }
     let t9;
     if ($[20] !== plusLines || $[21] !== verbose) {
-      t9 = !verbose && plusLines > 0 && <Text dimColor={true}>â€¦ +{plusLines} lines</Text>;
+      t9 = !verbose && plusLines > 0 && <Text dimColor={true}>â€?+{plusLines} lines</Text>;
       $[20] = plusLines;
       $[21] = verbose;
       $[22] = t9;

@@ -2,7 +2,7 @@ import { c as _c } from "react/compiler-runtime";
 import React from 'react';
 import Text from '../../ink/components/Text.js';
 type Props = {
-  /** The key or chord to display (e.g., "ctrl+o", "Enter", "â†‘/â†“") */
+  /** The key or chord to display (e.g., "ctrl+o", "Enter", "â†?â†?) */
   shortcut: string;
   /** The action the key performs (e.g., "expand", "select", "navigate") */
   action: string;
@@ -35,7 +35,7 @@ type Props = {
  *   </Byline>
  * </Text>
  */
-export function KeyboardShortcutHint(t0) {
+export function KeyboardShortcutHint(t0: Props) {
   const $ = _c(9);
   const {
     shortcut,

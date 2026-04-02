@@ -19,7 +19,7 @@ type BaseTextInputComponentProps = BaseTextInputProps & {
 /**
  * A base component for text inputs that handles rendering and basic input
  */
-export function BaseTextInput(t0) {
+export function BaseTextInput(t0: BaseTextInputComponentProps) {
   const $ = _c(14);
   const {
     inputState,
@@ -56,7 +56,7 @@ export function BaseTextInput(t0) {
     isPasting: t3
   } = usePasteHandler({
     onPaste: props.onPaste,
-    onInput: (input, key) => {
+    onInput: (input: string, key: any) => {
       if (isPasting && key.return) {
         return;
       }
@@ -95,7 +95,7 @@ export function BaseTextInput(t0) {
     viewportCharOffset,
     viewportCharEnd
   } = inputState;
-  const filteredHighlights = cursorFiltered && viewportCharOffset > 0 ? cursorFiltered.filter(h_0 => h_0.end > viewportCharOffset && h_0.start < viewportCharEnd).map(h_1 => ({
+  const filteredHighlights = cursorFiltered && viewportCharOffset > 0 ? cursorFiltered.filter((h_0: TextHighlight) => h_0.end > viewportCharOffset && h_0.start < viewportCharEnd).map((h_1: TextHighlight) => ({
     ...h_1,
     start: Math.max(0, h_1.start - viewportCharOffset),
     end: h_1.end - viewportCharOffset

@@ -1300,3 +1300,184 @@ the error surface is no longer dominated by missing wizard modules or broad `unk
 - then broader reconstructed `src/components/*` typing cleanup
 
 This confirms another phase change in the repair work: the agent wizard is now past its missing-type-definition stage and into ordinary component-level typing fixes.
+
+### Map-Backed Recovery Pass
+
+I then verified that `cli.js.map` contains valid `sourcesContent` for the reconstructed UI sources and used it as the ground truth for a small set of confirmed-bad files.
+
+Files rewritten directly from the map:
+- `src/components/design-system/ProgressBar.tsx`
+- `src/components/design-system/StatusIcon.tsx`
+- `src/components/LogoV2/Clawd.tsx`
+
+Validation:
+- Re-ran `./node_modules/.bin/tsc --noEmit -p tsconfig.json --pretty false`
+- The frontier moved past those restored files and is now concentrated in the next parse-error cluster, primarily:
+  - `src/components/DesktopHandoff.tsx`
+  - `src/components/diff/DiffDialog.tsx`
+  - `src/components/mcp/ElicitationDialog.tsx`
+  - `src/components/messages/AssistantRedactedThinkingMessage.tsx`
+  - `src/components/messages/AssistantThinkingMessage.tsx`
+
+This is a stronger signal than the earlier type-only cleanup passes: the remaining work is now a mix of genuine source corruption and deeper component-level repairs, not just missing props or implicit `any` annotations.
+
+### Parse Frontier Cleared
+
+I continued the map-backed recovery pass and rewrote the next set of confirmed-bad files directly from `cli.js.map`:
+- `src/components/DesktopHandoff.tsx`
+- `src/components/diff/DiffDialog.tsx`
+- `src/components/mcp/ElicitationDialog.tsx`
+- `src/components/messages/AssistantRedactedThinkingMessage.tsx`
+- `src/components/messages/AssistantThinkingMessage.tsx`
+- `src/components/messages/AssistantToolUseMessage.tsx`
+- `src/components/messages/UserTeammateMessage.tsx`
+- `src/components/ModelPicker.tsx`
+- `src/components/permissions/AskUserQuestionPermissionRequest/QuestionNavigationBar.tsx`
+- `src/components/PromptInput/PromptInputFooterLeftSide.tsx`
+- `src/components/PromptInput/PromptInputFooterSuggestions.tsx`
+- `src/components/Spinner/SpinnerGlyph.tsx`
+- `src/components/Spinner/TeammateSpinnerTree.tsx`
+- `src/components/Stats.tsx`
+- `src/components/tasks/ShellDetailDialog.tsx`
+- `src/components/TeleportProgress.tsx`
+- `src/components/TeleportRepoMismatchDialog.tsx`
+
+After that pass, `tsc --noEmit -p tsconfig.json --pretty false` no longer reported parse/unclosed-JSX failures in those files. The frontier has now shifted into ordinary type mismatches and implicit-`any` cleanup in the next layer of components.
+
+### Type-Only Frontier
+
+I then started the next cleanup pass on the now-stable source tree:
+- added explicit parameter types to `ApproveApiKey`, `AutoModeOptInDialog`, and `AutoUpdaterWrapper`
+- fixed the `useState<boolean | null>` typing in `AutoUpdaterWrapper`
+- tightened `AwsAuthStatusBox` and `BaseTextInput` helper/callback types
+
+The current `tsc` frontier is now dominated by standard type mismatches rather than encoding or JSX parse damage. The highest-signal remaining files are:
+- `src/commands/privacy-settings/privacy-settings.tsx`
+- `src/components/AutoUpdater.tsx`
+- `src/components/BashModeProgress.tsx`
+- `src/components/BridgeDialog.tsx`
+- `src/components/BypassPermissionsModeDialog.tsx`
+- `src/components/ClaudeInChromeOnboarding.tsx`
+- `src/components/ClaudeMdExternalIncludesDialog.tsx`
+- `src/components/ConsoleOAuthFlow.tsx`
+- `src/components/ContextVisualization.tsx`
+- `src/components/CoordinatorAgentStatus.tsx`
+
+### cli.js.map Inventory
+
+To avoid repeatedly guessing whether a remaining error can be fixed by restoring original source, I added a reusable `cli.js.map` comparison step:
+- `scripts/report-map-diff.mjs`
+- `openspec/changes/cli-js-map-diff.md`
+
+This compares every local `src/**/*.ts(x)` file against `cli.js.map` `sourcesContent` and classifies the result as missing, line-ending-only, mojibake/replacement-character corruption, or ordinary content drift.
+
+Current result:
+- local TypeScript sources now match `cli.js.map`
+- remaining `tsc` errors are therefore not explained by map drift
+- for the current frontier, direct map restoration is no longer expected to help; the remaining work is normal typing/signature repair
+
+### Continued Type Baseline Recovery
+
+I continued the repository-wide `tsc` cleanup with another focused batch aimed at pushing the first error screen deeper into the component tree:
+
+- fixed `ContextVisualization` helper types and removed permanently-disabled JSX branches from active type-checking
+- fixed `CtrlOToExpand`, `LoadingState`, `Ratchet`, `ThemedBox`, `ThemedText`, and `CustomSelect/select` typing gaps
+- fixed `DesktopHandoff`, `DevBar`, `DevChannelsDialog`, and `DiagnosticsDisplay`
+- restored missing `FeedbackSurvey` shared types in `src/components/FeedbackSurvey/utils.ts`
+- fixed `DesktopUpsell/DesktopUpsellStartup`, `Feedback`, `FeedbackSurvey/useMemorySurvey`, and `FeedbackSurvey/usePostCompactSurvey`
+
+After this pass, `tsc --noEmit -p tsconfig.json --pretty false` no longer reports:
+- `ContextVisualization.tsx`
+- `CtrlOToExpand.tsx`
+- `LoadingState.tsx`
+- `ThemedBox.tsx`
+- `ThemedText.tsx`
+- `DesktopHandoff.tsx`
+- `DevBar.tsx`
+- `DevChannelsDialog.tsx`
+- `DiagnosticsDisplay.tsx`
+- `DesktopUpsell/DesktopUpsellStartup.tsx`
+- `Feedback.tsx`
+
+The current first-screen frontier has now moved to:
+- `src/components/diff/DiffDetailView.tsx`
+- `src/components/diff/DiffDialog.tsx`
+- `src/components/diff/DiffFileList.tsx`
+- `src/components/EffortCallout.tsx`
+- `src/components/ExitFlow.tsx`
+- `src/components/FileEditToolDiff.tsx`
+- `src/components/FileEditToolUpdatedMessage.tsx`
+- `src/components/FileEditToolUseRejectedMessage.tsx`
+- `src/components/FullscreenLayout.tsx`
+
+Two remaining `FeedbackSurvey` files still require special handling:
+- `src/components/FeedbackSurvey/FeedbackSurveyView.tsx`
+- `src/components/FeedbackSurvey/TranscriptSharePrompt.tsx`
+
+Those two files are not currently valid UTF-8 on disk, so `apply_patch` cannot update them directly. They should be restored from `cli.js.map` original text before further local type edits.
+
+### Diff and FeedbackSurvey Cleanup
+
+I restored additional encoding-damaged files from `cli.js.map` and used that to continue the next type-only cleanup wave:
+
+- restored and fixed:
+  - `src/components/FeedbackSurvey/FeedbackSurveyView.tsx`
+  - `src/components/FeedbackSurvey/TranscriptSharePrompt.tsx`
+  - `src/components/diff/DiffFileList.tsx`
+- fixed typing/signatures in:
+  - `src/components/diff/DiffDialog.tsx`
+  - `src/components/diff/DiffDetailView.tsx` indirectly via `StructuredDiff`
+  - `src/components/FileEditToolDiff.tsx`
+  - `src/components/StructuredDiff.tsx`
+  - `src/components/HighlightedCode.tsx`
+  - `src/components/FileEditToolUpdatedMessage.tsx`
+  - `src/components/ExitFlow.tsx`
+  - `src/components/EffortCallout.tsx`
+
+After this pass, the entire `diff/*`, `FeedbackSurvey/*`, `FileEditTool*`, `ExitFlow`, and `EffortCallout` groups dropped off the first `tsc` screen.
+
+The current leading frontier is now concentrated in:
+- `src/components/FullscreenLayout.tsx`
+- `src/components/GlobalSearchDialog.tsx`
+
+That is a useful boundary: the current work is no longer scattered across many small files. The next cleanup wave should focus on those two larger components first.
+
+### Fullscreen, Search, Grove, and HighlightedCode Recovery
+
+I continued from the `FullscreenLayout` / `GlobalSearchDialog` boundary and pushed the first `tsc` screen past those larger shared components:
+
+- fixed `src/components/FullscreenLayout.tsx`
+  - narrowed `stickyPrompt` state to `StickyPrompt | "clicked" | null`
+  - added missing callback/helper parameter types
+  - fixed helper component signatures for `NewMessagesPill` and `StickyPromptHeader`
+- fixed `src/components/GlobalSearchDialog.tsx`
+  - typed search state, preview state, abort/timeout refs, and list callback parameters
+  - restored stable empty-array sentinels as typed arrays/tuples
+  - typed the debounced ripgrep helper path
+- fixed `src/components/grove/Grove.tsx`
+  - widened `useState(null)` sites to real `boolean | null` / `GroveConfig | null`
+  - typed dialog option values, input handlers, and exit-state renderers
+- fixed `src/components/HelpV2/Commands.tsx` and `src/components/HelpV2/HelpV2.tsx`
+  - removed implicit `any` callback parameters
+  - typed memoized empty command arrays
+- fixed `src/components/HighlightedCode.tsx`
+  - typed DOM refs, line render callbacks, and `CodeLine` props
+- restored `src/components/HighlightedCode/Fallback.tsx` from `cli.js.map` original text, then typed its props and highlight loader path
+
+After this pass, `tsc --noEmit -p tsconfig.json --pretty false` no longer reports:
+- `src/components/FullscreenLayout.tsx`
+- `src/components/GlobalSearchDialog.tsx`
+- `src/components/grove/Grove.tsx`
+- `src/components/HelpV2/Commands.tsx`
+- `src/components/HelpV2/HelpV2.tsx`
+- `src/components/HighlightedCode.tsx`
+- `src/components/HighlightedCode/Fallback.tsx`
+
+The current first-screen frontier has now moved into the hooks configuration UI:
+- `src/components/hooks/HooksConfigMenu.tsx`
+- `src/components/hooks/PromptDialog.tsx`
+- `src/components/hooks/SelectEventMode.tsx`
+- `src/components/hooks/SelectHookMode.tsx`
+- `src/components/hooks/SelectMatcherMode.tsx`
+
+This is another good phase boundary: the remaining first-screen errors are now concentrated in one module family instead of shared layout/search/rendering components.

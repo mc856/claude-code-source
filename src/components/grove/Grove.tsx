@@ -8,6 +8,14 @@ import { Byline } from '../design-system/Byline.js';
 import { Dialog } from '../design-system/Dialog.js';
 import { KeyboardShortcutHint } from '../design-system/KeyboardShortcutHint.js';
 export type GroveDecision = 'accept_opt_in' | 'accept_opt_out' | 'defer' | 'escape' | 'skip_rendering';
+type GroveOption = {
+  label: string;
+  value: 'accept_opt_in' | 'accept_opt_out' | 'defer';
+};
+type ExitState = {
+  pending: boolean;
+  keyName: string | null;
+};
 type Props = {
   showIfAlreadyViewed: boolean;
   location: 'settings' | 'policy_update_modal' | 'onboarding';
@@ -53,14 +61,14 @@ function GracePeriodContentBody() {
   }
   let t4;
   if ($[4] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = <Box paddingLeft={1}><Text>{t2}{t3}<Text>— Allow the use of your chats and coding sessions to train and improve Anthropic AI models. Change anytime in your Privacy Settings (<Link url="https://claude.ai/settings/data-privacy-controls" />).</Text></Text></Box>;
+    t4 = <Box paddingLeft={1}><Text>{t2}{t3}<Text>�?Allow the use of your chats and coding sessions to train and improve Anthropic AI models. Change anytime in your Privacy Settings (<Link url="https://claude.ai/settings/data-privacy-controls" />).</Text></Text></Box>;
     $[4] = t4;
   } else {
     t4 = $[4];
   }
   let t5;
   if ($[5] === Symbol.for("react.memo_cache_sentinel")) {
-    t5 = <Box flexDirection="column">{t1}{t4}<Box paddingLeft={1}><Text><Text>· </Text><Text bold={true}>Updates to data retention </Text><Text>— To help us improve our AI models and safety protections, we're extending data retention to 5 years.</Text></Text></Box></Box>;
+    t5 = <Box flexDirection="column">{t1}{t4}<Box paddingLeft={1}><Text><Text>· </Text><Text bold={true}>Updates to data retention </Text><Text>�?To help us improve our AI models and safety protections, we're extending data retention to 5 years.</Text></Text></Box></Box>;
     $[5] = t5;
   } else {
     t5 = $[5];
@@ -141,15 +149,15 @@ function PostGracePeriodContentBody() {
   }
   return t6;
 }
-export function GroveDialog(t0) {
+export function GroveDialog(t0: Props) {
   const $ = _c(34);
   const {
     showIfAlreadyViewed,
     location,
     onDone
   } = t0;
-  const [shouldShowDialog, setShouldShowDialog] = useState(null);
-  const [groveConfig, setGroveConfig] = useState(null);
+  const [shouldShowDialog, setShouldShowDialog] = useState<boolean | null>(null);
+  const [groveConfig, setGroveConfig] = useState<GroveConfig | null>(null);
   let t1;
   let t2;
   if ($[0] !== location || $[1] !== onDone || $[2] !== showIfAlreadyViewed) {
@@ -191,7 +199,7 @@ export function GroveDialog(t0) {
   }
   let t3;
   if ($[5] !== groveConfig?.notice_is_grace_period || $[6] !== onDone) {
-    t3 = async function onChange(value) {
+    t3 = async function onChange(value: 'accept_opt_in' | 'accept_opt_out' | 'defer' | 'escape') {
       bb21: switch (value) {
         case "accept_opt_in":
           {
@@ -249,7 +257,7 @@ export function GroveDialog(t0) {
   } else {
     t4 = $[9];
   }
-  const acceptOptions = t4;
+  const acceptOptions: GroveOption[] = t4;
   let t5;
   if ($[10] !== groveConfig?.notice_is_grace_period || $[11] !== onChange) {
     t5 = function handleCancel() {
@@ -301,7 +309,7 @@ export function GroveDialog(t0) {
     t10 = groveConfig?.notice_is_grace_period ? [{
       label: "Not now",
       value: "defer"
-    }] : [];
+    }] : [] as GroveOption[];
     $[19] = groveConfig?.notice_is_grace_period;
     $[20] = t10;
   } else {
@@ -318,7 +326,7 @@ export function GroveDialog(t0) {
   }
   let t12;
   if ($[24] !== onChange) {
-    t12 = value_0 => onChange(value_0 as 'accept_opt_in' | 'accept_opt_out' | 'defer');
+    t12 = (value_0: string) => onChange(value_0 as 'accept_opt_in' | 'accept_opt_out' | 'defer');
     $[24] = onChange;
     $[25] = t12;
   } else {
@@ -346,7 +354,7 @@ export function GroveDialog(t0) {
   }
   return t14;
 }
-function _temp(exitState) {
+function _temp(exitState: ExitState) {
   return exitState.pending ? <Text>Press {exitState.keyName} again to exit</Text> : <Byline><KeyboardShortcutHint shortcut="Enter" action="confirm" /><KeyboardShortcutHint shortcut="Esc" action="cancel" /></Byline>;
 }
 type PrivacySettingsDialogProps = {
@@ -354,7 +362,7 @@ type PrivacySettingsDialogProps = {
   domainExcluded?: boolean;
   onDone(): void;
 };
-export function PrivacySettingsDialog(t0) {
+export function PrivacySettingsDialog(t0: PrivacySettingsDialogProps) {
   const $ = _c(17);
   const {
     settings,
@@ -364,7 +372,7 @@ export function PrivacySettingsDialog(t0) {
   const [groveEnabled, setGroveEnabled] = useState(settings.grove_enabled);
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-    t1 = [];
+    t1 = [] as const;
     $[0] = t1;
   } else {
     t1 = $[0];
@@ -372,7 +380,7 @@ export function PrivacySettingsDialog(t0) {
   React.useEffect(_temp2, t1);
   let t2;
   if ($[1] !== domainExcluded || $[2] !== groveEnabled) {
-    t2 = async (input, key) => {
+    t2 = async (input: string, key: { tab?: boolean; return?: boolean }) => {
       if (!domainExcluded && (key.tab || key.return || input === " ")) {
         const newValue = !groveEnabled;
         setGroveEnabled(newValue);
@@ -417,7 +425,7 @@ export function PrivacySettingsDialog(t0) {
   }
   let t4;
   if ($[7] !== domainExcluded) {
-    t4 = exitState => exitState.pending ? <Text>Press {exitState.keyName} again to exit</Text> : domainExcluded ? <KeyboardShortcutHint shortcut="Esc" action="cancel" /> : <Byline><KeyboardShortcutHint shortcut="Enter/Tab/Space" action="toggle" /><KeyboardShortcutHint shortcut="Esc" action="cancel" /></Byline>;
+    t4 = (exitState: ExitState) => exitState.pending ? <Text>Press {exitState.keyName} again to exit</Text> : domainExcluded ? <KeyboardShortcutHint shortcut="Esc" action="cancel" /> : <Byline><KeyboardShortcutHint shortcut="Enter/Tab/Space" action="toggle" /><KeyboardShortcutHint shortcut="Esc" action="cancel" /></Byline>;
     $[7] = domainExcluded;
     $[8] = t4;
   } else {

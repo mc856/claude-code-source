@@ -22,7 +22,7 @@ type Props = {
  * Uses StructuredDiff for word-level diffing and syntax highlighting.
  * No scrolling - renders all lines (max 400 due to parsing limits).
  */
-export function DiffDetailView(t0) {
+export function DiffDetailView(t0: Props) {
   const $ = _c(53);
   const {
     filePath,
@@ -260,7 +260,7 @@ export function DiffDetailView(t0) {
   }
   let t8;
   if ($[47] !== isTruncated) {
-    t8 = isTruncated && <Text dimColor={true} italic={true}>â€¦ diff truncated (exceeded 400 line limit)</Text>;
+    t8 = isTruncated && <Text dimColor={true} italic={true}>â€?diff truncated (exceeded 400 line limit)</Text>;
     $[47] = isTruncated;
     $[48] = t8;
   } else {

@@ -344,7 +344,7 @@ type OAuthStatusMessageProps = {
   setOAuthStatus: (status: OAuthStatus) => void;
   setLoginWithClaudeAi: (value: boolean) => void;
 };
-function OAuthStatusMessage(t0) {
+function OAuthStatusMessage(t0: OAuthStatusMessageProps) {
   const $ = _c(51);
   const {
     oauthStatus,
@@ -360,7 +360,7 @@ function OAuthStatusMessage(t0) {
     handleSubmitCode,
     setOAuthStatus,
     setLoginWithClaudeAi
-  } = t0;
+} = t0 as OAuthStatusMessageProps;
   switch (oauthStatus.state) {
     case "idle":
       {
@@ -412,7 +412,7 @@ function OAuthStatusMessage(t0) {
         }
         let t7;
         if ($[6] !== setLoginWithClaudeAi || $[7] !== setOAuthStatus) {
-          t7 = <Box><Select options={t6} onChange={value_0 => {
+          t7 = <Box><Select options={t6} onChange={(value_0: 'claudeai' | 'console' | 'platform') => {
               if (value_0 === "platform") {
                 logEvent("tengu_oauth_platform_selected", {});
                 setOAuthStatus({

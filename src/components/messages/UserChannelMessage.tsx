@@ -16,14 +16,14 @@ const CHANNEL_RE = new RegExp(`<${CHANNEL_TAG}\\s+source="([^"]+)"([^>]*)>\\n?([
 const USER_ATTR_RE = /\buser="([^"]+)"/;
 
 // Plugin-provided servers get names like plugin:slack-channel:slack via
-// addPluginScopeToServers â€” show just the leaf. Matches the suffix-match
+// addPluginScopeToServers â€?show just the leaf. Matches the suffix-match
 // logic in isServerInChannels.
 function displayServerName(name: string): string {
   const i = name.lastIndexOf(':');
   return i === -1 ? name : name.slice(i + 1);
 }
 const TRUNCATE_AT = 60;
-export function UserChannelMessage(t0) {
+export function UserChannelMessage(t0: Props) {
   const $ = _c(29);
   const {
     addMargin,

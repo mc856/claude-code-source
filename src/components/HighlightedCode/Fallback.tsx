@@ -12,13 +12,14 @@ type Props = {
   dim?: boolean;
   skipColoring?: boolean;
 };
+type CliHighlight = NonNullable<Awaited<ReturnType<typeof getCliHighlightPromise>>>;
 
 // Module-level highlight cache — hl.highlight() is the hot cost on virtual-
 // scroll remounts. useMemo doesn't survive unmount→remount. Keyed by hash
 // of code+language to avoid retaining full source strings (#24180 RSS fix).
 const HL_CACHE_MAX = 500;
 const hlCache = new Map<string, string>();
-function cachedHighlight(hl: NonNullable<Awaited<ReturnType<typeof getCliHighlightPromise>>>, code: string, language: string): string {
+function cachedHighlight(hl: CliHighlight, code: string, language: string): string {
   const key = hashPair(language, code);
   const hit = hlCache.get(key);
   if (hit !== undefined) {
@@ -36,7 +37,7 @@ function cachedHighlight(hl: NonNullable<Awaited<ReturnType<typeof getCliHighlig
   hlCache.set(key, out);
   return out;
 }
-export function HighlightedCodeFallback(t0) {
+export function HighlightedCodeFallback(t0: Props): React.ReactElement {
   const $ = _c(20);
   const {
     code,
@@ -121,7 +122,10 @@ export function HighlightedCodeFallback(t0) {
   }
   return t8;
 }
-function Highlighted(t0) {
+function Highlighted(t0: {
+  codeWithSpaces: string;
+  language: string;
+}): React.ReactElement {
   const $ = _c(10);
   const {
     codeWithSpaces,
@@ -134,7 +138,7 @@ function Highlighted(t0) {
   } else {
     t1 = $[0];
   }
-  const hl = use(t1);
+  const hl: CliHighlight | null = use(t1);
   let t2;
   if ($[1] !== codeWithSpaces || $[2] !== hl || $[3] !== language) {
     bb0: {

@@ -77,7 +77,7 @@ function resolveColor(color: keyof Theme | Color | undefined, theme: Theme): Col
  * Theme-aware Text component that resolves theme color keys to raw colors.
  * This wraps the base Text component with theme resolution.
  */
-export default function ThemedText(t0) {
+export default function ThemedText(t0: Props): React.ReactNode {
   const $ = _c(10);
   const {
     color,
@@ -102,7 +102,7 @@ export default function ThemedText(t0) {
   const theme = getTheme(themeName);
   const hoverColor = useContext(TextHoverColorContext);
   const resolvedColor = !color && hoverColor ? resolveColor(hoverColor, theme) : dimColor ? theme.inactive as Color : resolveColor(color, theme);
-  const resolvedBackgroundColor = backgroundColor ? theme[backgroundColor] as Color : undefined;
+  const resolvedBackgroundColor = backgroundColor ? theme[backgroundColor as keyof typeof theme] as Color : undefined;
   let t8;
   if ($[0] !== bold || $[1] !== children || $[2] !== inverse || $[3] !== italic || $[4] !== resolvedBackgroundColor || $[5] !== resolvedColor || $[6] !== strikethrough || $[7] !== underline || $[8] !== wrap) {
     t8 = <Text color={resolvedColor} backgroundColor={resolvedBackgroundColor} bold={bold} italic={italic} underline={underline} strikethrough={strikethrough} inverse={inverse} wrap={wrap}>{children}</Text>;

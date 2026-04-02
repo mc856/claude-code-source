@@ -1,5 +1,6 @@
 import { c as _c } from "react/compiler-runtime";
 import React, { useCallback } from 'react';
+import { type ProjectConfig } from '../utils/config.js';
 import { logEvent } from 'src/services/analytics/index.js';
 import { Box, Link, Text } from '../ink.js';
 import type { ExternalClaudeMdInclude } from '../utils/claudemd.js';
@@ -11,7 +12,7 @@ type Props = {
   isStandaloneDialog?: boolean;
   externalIncludes?: ExternalClaudeMdInclude[];
 };
-export function ClaudeMdExternalIncludesDialog(t0) {
+export function ClaudeMdExternalIncludesDialog(t0: Props) {
   const $ = _c(18);
   const {
     onDone,
@@ -20,7 +21,7 @@ export function ClaudeMdExternalIncludesDialog(t0) {
   } = t0;
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-    t1 = [];
+    t1 = [] as const;
     $[0] = t1;
   } else {
     t1 = $[0];
@@ -28,7 +29,7 @@ export function ClaudeMdExternalIncludesDialog(t0) {
   React.useEffect(_temp, t1);
   let t2;
   if ($[1] !== onDone) {
-    t2 = value => {
+    t2 = (value: 'yes' | 'no') => {
       if (value === "no") {
         logEvent("tengu_claude_md_external_includes_dialog_declined", {});
         saveCurrentProjectConfig(_temp2);
@@ -94,7 +95,7 @@ export function ClaudeMdExternalIncludesDialog(t0) {
   }
   let t10;
   if ($[10] !== handleSelection) {
-    t10 = <Select options={t9} onChange={value_0 => handleSelection(value_0 as 'yes' | 'no')} />;
+    t10 = <Select options={t9} onChange={(value_0: 'yes' | 'no') => handleSelection(value_0)} />;
     $[10] = handleSelection;
     $[11] = t10;
   } else {
@@ -114,17 +115,17 @@ export function ClaudeMdExternalIncludesDialog(t0) {
   }
   return t11;
 }
-function _temp4(include, i) {
+function _temp4(include: ExternalClaudeMdInclude, i: number) {
   return <Text key={i} dimColor={true}>{"  "}{include.path}</Text>;
 }
-function _temp3(current_0) {
+function _temp3(current_0: ProjectConfig) {
   return {
     ...current_0,
     hasClaudeMdExternalIncludesApproved: true,
     hasClaudeMdExternalIncludesWarningShown: true
   };
 }
-function _temp2(current) {
+function _temp2(current: ProjectConfig) {
   return {
     ...current,
     hasClaudeMdExternalIncludesApproved: false,

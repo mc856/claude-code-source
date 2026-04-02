@@ -86,10 +86,15 @@ export function useCoordinatorTaskCount() {
   t0 = 0;
   return t0;
 }
-function _temp(s) {
+function _temp(s: AppState): AppState['tasks'] {
   return s.tasks;
 }
-function MainLine(t0) {
+type MainLineProps = {
+  isSelected?: boolean;
+  isViewed?: boolean;
+  onClick?: () => void;
+};
+function MainLine(t0: MainLineProps): React.ReactNode {
   const $ = _c(10);
   const {
     isSelected,
@@ -140,7 +145,7 @@ type AgentLineProps = {
   isViewed?: boolean;
   onClick?: () => void;
 };
-function AgentLine(t0) {
+function AgentLine(t0: AgentLineProps): React.ReactNode {
   const $ = _c(32);
   const {
     task,

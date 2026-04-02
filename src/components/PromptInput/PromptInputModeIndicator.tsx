@@ -38,7 +38,7 @@ type PromptCharProps = {
 };
 
 /**
- * Renders the prompt character (‚ùØ).
+ * Renders the prompt character (‚ù?.
  * Teammate color overrides the default color when set.
  */
 function PromptChar(t0) {
@@ -60,7 +60,7 @@ function PromptChar(t0) {
   }
   return t1;
 }
-export function PromptInputModeIndicator(t0) {
+export function PromptInputModeIndicator(t0: Props) {
   const $ = _c(6);
   const {
     mode,

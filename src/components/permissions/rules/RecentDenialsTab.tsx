@@ -16,7 +16,7 @@ type Props = {
     denials: readonly AutoModeDenial[];
   }) => void;
 };
-export function RecentDenialsTab(t0) {
+export function RecentDenialsTab(t0: Props) {
   const $ = _c(30);
   const {
     onHeaderFocusChange,

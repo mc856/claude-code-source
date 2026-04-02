@@ -17,7 +17,7 @@ type Props = {
   onDone: (selection: EffortCalloutSelection) => void;
 };
 const AUTO_DISMISS_MS = 30_000;
-export function EffortCallout(t0) {
+export function EffortCallout(t0: Props): React.ReactNode {
   const $ = _c(18);
   const {
     model,
@@ -55,7 +55,7 @@ export function EffortCallout(t0) {
   const handleCancel = t3;
   let t4;
   if ($[4] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = [];
+    t4 = [] as const;
     $[4] = t4;
   } else {
     t4 = $[4];
@@ -88,7 +88,7 @@ export function EffortCallout(t0) {
   const defaultLevel = t7;
   let t8;
   if ($[9] !== defaultLevel) {
-    t8 = value => {
+    t8 = (value: EffortLevel) => {
       const effortLevel = value === defaultLevel ? undefined : value;
       updateSettingsForSource("userSettings", {
         effortLevel: toPersistableEffort(effortLevel)
@@ -159,7 +159,9 @@ export function EffortCallout(t0) {
 function _temp() {
   markV2Dismissed();
 }
-function EffortIndicatorSymbol(t0) {
+function EffortIndicatorSymbol(t0: {
+  level: EffortLevel;
+}): React.ReactNode {
   const $ = _c(4);
   const {
     level
@@ -182,7 +184,10 @@ function EffortIndicatorSymbol(t0) {
   }
   return t2;
 }
-function EffortOptionLabel(t0) {
+function EffortOptionLabel(t0: {
+  level: EffortLevel;
+  text: string;
+}): React.ReactNode {
   const $ = _c(5);
   const {
     level,
