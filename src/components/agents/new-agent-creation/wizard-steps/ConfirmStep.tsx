@@ -154,7 +154,7 @@ export function ConfirmStep(t0: Props) {
     let t25;
     if ($[39] !== agent.agentType || $[40] !== wizardData.location) {
       t25 = getNewRelativeAgentFilePath({
-        source: wizardData.location,
+        source: wizardData.location!,
         agentType: agent.agentType
       });
       $[39] = agent.agentType;
@@ -354,13 +354,13 @@ export function ConfirmStep(t0: Props) {
   }
   return t25;
 }
-function _temp3(err, i_0) {
+function _temp3(err: string, i_0: number) {
   return <Text key={i_0} color="error">{" "}• {err}</Text>;
 }
-function _temp2(warning, i) {
+function _temp2(warning: string, i: number) {
   return <Text key={i} dimColor={true}>{" "}• {warning}</Text>;
 }
-function _temp(toolNames) {
+function _temp(toolNames: string[] | undefined) {
   if (toolNames === undefined) {
     return "All tools";
   }

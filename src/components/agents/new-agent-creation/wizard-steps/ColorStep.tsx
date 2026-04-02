@@ -30,21 +30,24 @@ export function ColorStep() {
   useKeybinding("confirm:no", goBack, t0);
   let t1;
   if ($[1] !== goNext || $[2] !== updateWizardData || $[3] !== wizardData.agentType || $[4] !== wizardData.location || $[5] !== wizardData.selectedModel || $[6] !== wizardData.selectedTools || $[7] !== wizardData.systemPrompt || $[8] !== wizardData.whenToUse) {
-    t1 = (color?: string) => {
+    t1 = (color?: AgentColorName | 'automatic') => {
+      const agentType = wizardData.agentType!;
+      const systemPrompt = wizardData.systemPrompt!;
+      const whenToUse = wizardData.whenToUse!;
       updateWizardData({
         selectedColor: color,
         finalAgent: {
-          agentType: wizardData.agentType,
-          whenToUse: wizardData.whenToUse,
-          getSystemPrompt: () => wizardData.systemPrompt,
+          agentType,
+          whenToUse,
+          getSystemPrompt: () => systemPrompt,
           tools: wizardData.selectedTools,
           ...(wizardData.selectedModel ? {
             model: wizardData.selectedModel
           } : {}),
-          ...(color ? {
-            color: color as AgentColorName
+          ...(color && color !== 'automatic' ? {
+            color
           } : {}),
-          source: wizardData.location
+          source: wizardData.location!
         }
       });
       goNext();
@@ -72,7 +75,7 @@ export function ColorStep() {
   const t3 = wizardData.agentType || "agent";
   let t4;
   if ($[11] !== handleConfirm || $[12] !== t3) {
-    t4 = <WizardDialogLayout subtitle="Choose background color" footerText={t2}><Box><ColorPicker agentName={t3} currentColor="automatic" onConfirm={handleConfirm} /></Box></WizardDialogLayout>;
+    t4 = <WizardDialogLayout subtitle="Choose background color" footerText={t2}><Box><ColorPicker agentName={t3} currentColor={wizardData.selectedColor} onConfirm={handleConfirm} /></Box></WizardDialogLayout>;
     $[11] = handleConfirm;
     $[12] = t3;
     $[13] = t4;

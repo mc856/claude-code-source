@@ -150,7 +150,7 @@ export function AgentEditor({
     case 'menu':
       return renderMenu();
     case 'edit-tools':
-      return <ToolSelector tools={tools} initialTools={agent.tools} onComplete={async (finalTools: string[]) => {
+      return <ToolSelector tools={tools} initialTools={agent.tools} onComplete={async (finalTools: string[] | undefined) => {
         setEditMode('menu');
         await handleSave({
           tools: finalTools
