@@ -38,6 +38,10 @@ import {
   createV2ReplTransport,
 } from './replBridgeTransport.js'
 import { updateSessionIngressAuthToken } from '../utils/sessionIngressAuth.js'
+
+type BridgeWritableSDKMessage = SDKMessage & {
+  uuid?: string
+}
 import { isEnvTruthy, isInProtectedNamespace } from '../utils/envUtils.js'
 import { validateBridgeId } from './bridgeApi.js'
 import {
@@ -1293,7 +1297,7 @@ export async function initBridgeCore(
                     return
                   }
                   if (previouslyFlushedUUIDs) {
-                    for (const sdkMsg of sdkMessages) {
+                    for (const sdkMsg of sdkMessages as BridgeWritableSDKMessage[]) {
                       if (sdkMsg.uuid) {
                         previouslyFlushedUUIDs.add(sdkMsg.uuid)
                       }
@@ -1760,7 +1764,9 @@ export async function initBridgeCore(
       // No initialMessageUUIDs filter — daemon has no initial messages.
       // No flushGate — daemon never starts it (no initial flush).
       const filtered = messages.filter(
-        m => !m.uuid || !recentPostedUUIDs.has(m.uuid),
+        m =>
+          !(m as BridgeWritableSDKMessage).uuid ||
+          !recentPostedUUIDs.has((m as BridgeWritableSDKMessage).uuid!),
       )
       if (filtered.length === 0) return
       if (!transport) {
@@ -1771,7 +1777,8 @@ export async function initBridgeCore(
         return
       }
       for (const msg of filtered) {
-        if (msg.uuid) recentPostedUUIDs.add(msg.uuid)
+        const uuid = (msg as BridgeWritableSDKMessage).uuid
+        if (uuid) recentPostedUUIDs.add(uuid)
       }
       const events = filtered.map(m => ({ ...m, session_id: currentSessionId }))
       void transport.writeBatch(events)

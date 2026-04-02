@@ -78,7 +78,21 @@ export function registerMcpAddCommand(mcp: Command): void {
         "Enable XAA (SEP-990) for this server. Requires 'claude mcp xaa setup' first. Also requires --client-id and --client-secret (for the MCP server's AS).",
       ).hideHelp(!isXaaEnabled()),
     )
-    .action(async (name, commandOrUrl, args, options) => {
+    .action(async (
+      name: string,
+      commandOrUrl: string,
+      args: string[],
+      options: {
+        scope: string
+        transport?: string
+        env?: string[]
+        header?: string[]
+        clientId?: string
+        clientSecret?: boolean
+        callbackPort?: string
+        xaa?: boolean
+      },
+    ) => {
       // Commander.js handles -- natively: it consumes -- and everything after becomes args
       const actualCommand = commandOrUrl
       const actualArgs = args

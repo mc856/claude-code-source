@@ -155,13 +155,17 @@ export async function mcpListHandler(): Promise<void> {
 
     // Check servers concurrently
     const entries = Object.entries(configs);
-    const results = await pMap(entries, async ([name, server]) => ({
+    const results = await pMap(
+      entries,
+      async ([name, server]: [string, (typeof entries)[number][1]]) => ({
       name,
       server,
       status: await checkMcpServerHealth(name, server)
-    }), {
+      }),
+      {
       concurrency: getMcpServerConnectionBatchSize()
-    });
+      },
+    );
     for (const {
       name,
       server,

@@ -28,6 +28,32 @@ import type { PermissionMode } from '../utils/permissions/PermissionMode.js'
 import { jsonParse } from '../utils/slowOperations.js'
 import type { ReplBridgeTransport } from './replBridgeTransport.js'
 
+type BridgeSDKMessage = SDKMessage & {
+  type: string
+  uuid?: string
+}
+
+type BridgeSDKControlRequest = SDKControlRequest & {
+  type: 'control_request'
+  request_id: string
+  request: {
+    subtype: string
+    model?: string
+    max_thinking_tokens?: number | null
+    mode?: PermissionMode
+  }
+}
+
+type BridgeSDKControlResponse = SDKControlResponse & {
+  type: 'control_response'
+  response: {
+    subtype: string
+    request_id: string
+    error?: string
+    response?: unknown
+  }
+}
+
 // ─── Type guards ─────────────────────────────────────────────────────────────
 
 /** Type predicate for parsed WebSocket messages. SDKMessage is a
@@ -45,7 +71,7 @@ export function isSDKMessage(value: unknown): value is SDKMessage {
 /** Type predicate for control_response messages from the server. */
 export function isSDKControlResponse(
   value: unknown,
-): value is SDKControlResponse {
+): value is BridgeSDKControlResponse {
   return (
     value !== null &&
     typeof value === 'object' &&
@@ -58,7 +84,7 @@ export function isSDKControlResponse(
 /** Type predicate for control_request messages from the server. */
 export function isSDKControlRequest(
   value: unknown,
-): value is SDKControlRequest {
+): value is BridgeSDKControlRequest {
   return (
     value !== null &&
     typeof value === 'object' &&
@@ -150,24 +176,23 @@ export function handleIngressMessage(
     // control_request from the server (initialize, set_model, can_use_tool).
     // Must respond promptly or the server kills the WS (~10-14s timeout).
     if (isSDKControlRequest(parsed)) {
+      const controlRequest = parsed as BridgeSDKControlRequest
       logForDebugging(
-        `[bridge:repl] Inbound control_request subtype=${parsed.request.subtype}`,
+        `[bridge:repl] Inbound control_request subtype=${controlRequest.request.subtype}`,
       )
-      onControlRequest?.(parsed)
+      onControlRequest?.(controlRequest)
       return
     }
 
     if (!isSDKMessage(parsed)) return
+    const sdkMessage = parsed as BridgeSDKMessage
 
     // Check for UUID to detect echoes of our own messages
-    const uuid =
-      'uuid' in parsed && typeof parsed.uuid === 'string'
-        ? parsed.uuid
-        : undefined
+    const uuid = typeof sdkMessage.uuid === 'string' ? sdkMessage.uuid : undefined
 
     if (uuid && recentPostedUUIDs.has(uuid)) {
       logForDebugging(
-        `[bridge:repl] Ignoring echo: type=${parsed.type} uuid=${uuid}`,
+        `[bridge:repl] Ignoring echo: type=${sdkMessage.type} uuid=${uuid}`,
       )
       return
     }
@@ -179,25 +204,25 @@ export function handleIngressMessage(
     // receiving any frames, etc).
     if (uuid && recentInboundUUIDs.has(uuid)) {
       logForDebugging(
-        `[bridge:repl] Ignoring re-delivered inbound: type=${parsed.type} uuid=${uuid}`,
+        `[bridge:repl] Ignoring re-delivered inbound: type=${sdkMessage.type} uuid=${uuid}`,
       )
       return
     }
 
     logForDebugging(
-      `[bridge:repl] Ingress message type=${parsed.type}${uuid ? ` uuid=${uuid}` : ''}`,
+      `[bridge:repl] Ingress message type=${sdkMessage.type}${uuid ? ` uuid=${uuid}` : ''}`,
     )
 
-    if (parsed.type === 'user') {
+    if (sdkMessage.type === 'user') {
       if (uuid) recentInboundUUIDs.add(uuid)
       logEvent('tengu_bridge_message_received', {
         is_repl: true,
       })
       // Fire-and-forget — handler may be async (attachment resolution).
-      void onInboundMessage?.(parsed)
+      void onInboundMessage?.(sdkMessage)
     } else {
       logForDebugging(
-        `[bridge:repl] Ignoring non-user inbound message: type=${parsed.type}`,
+        `[bridge:repl] Ignoring non-user inbound message: type=${sdkMessage.type}`,
       )
     }
   } catch (err) {
@@ -241,7 +266,7 @@ const OUTBOUND_ONLY_ERROR =
  * collaborators as params so both cores can use it.
  */
 export function handleServerControlRequest(
-  request: SDKControlRequest,
+  request: BridgeSDKControlRequest,
   handlers: ServerControlRequestHandlers,
 ): void {
   const {
@@ -260,7 +285,7 @@ export function handleServerControlRequest(
     return
   }
 
-  let response: SDKControlResponse
+  let response: BridgeSDKControlResponse
 
   // Outbound-only: reply error for mutable requests so claude.ai doesn't show
   // false success. initialize must still succeed (server kills the connection

@@ -20,6 +20,14 @@ type CheckResult = {
 } | {
   status: 'gh_not_authenticated';
 };
+type ExecaLike = (file: string, args: string[], options: {
+  stdout: 'pipe';
+  stderr: 'ignore';
+  timeout: number;
+  reject: boolean;
+}) => Promise<{
+  stdout: string;
+}>;
 async function checkLoginState(): Promise<CheckResult> {
   if (!(await isSignedIn())) {
     return {
@@ -40,9 +48,10 @@ async function checkLoginState(): Promise<CheckResult> {
 
   // ghStatus === 'authenticated'. getGhAuthStatus spawns with stdout:'ignore'
   // (telemetry-safe); spawn once more with stdout:'pipe' to read the token.
+  const runExeca = execa as unknown as ExecaLike;
   const {
     stdout
-  } = await execa('gh', ['auth', 'token'], {
+  } = await runExeca('gh', ['auth', 'token'], {
     stdout: 'pipe',
     stderr: 'ignore',
     timeout: 5000,
@@ -172,7 +181,7 @@ function Web({
     }, {
       label: 'Cancel',
       value: 'cancel'
-    }]} onChange={value => {
+    }]} onChange={(value: string) => {
       if (value === 'send') {
         void handleConfirm(token);
       } else {

@@ -12,7 +12,14 @@ import { applyPermissionUpdate, persistPermissionUpdate } from '../../utils/perm
 import type { PermissionUpdateDestination } from '../../utils/permissions/PermissionUpdateSchema.js';
 import { SandboxManager } from '../../utils/sandbox/sandbox-adapter.js';
 import { addDirHelpMessage, validateDirectoryForWorkspace } from './validation.js';
-function AddDirError(t0) {
+
+type AddDirErrorProps = {
+  message: string
+  args: string
+  onDone: () => void
+}
+
+function AddDirError(t0: AddDirErrorProps) {
   const $ = _c(10);
   const {
     message,

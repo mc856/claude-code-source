@@ -35,3 +35,7 @@ export const TungstenTool = {
     return 'TungstenTool'
   },
 } as unknown as Tool
+
+export function clearSessionsWithTungstenUsage(): void {}
+
+export function resetInitializationState(): void {}

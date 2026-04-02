@@ -71,7 +71,7 @@ export function AgentEditor({
         setAgentColor(agent.agentType, finalColor);
       }
       setAppState(state => {
-        const allAgents = state.agentDefinitions.allAgents.map(a => a.agentType === agent.agentType ? {
+        const allAgents = state.agentDefinitions.allAgents.map((a: AgentDefinition) => a.agentType === agent.agentType ? {
           ...a,
           tools: newTools ?? a.tools,
           color: finalColor,
@@ -150,14 +150,14 @@ export function AgentEditor({
     case 'menu':
       return renderMenu();
     case 'edit-tools':
-      return <ToolSelector tools={tools} initialTools={agent.tools} onComplete={async finalTools => {
+      return <ToolSelector tools={tools} initialTools={agent.tools} onComplete={async (finalTools: string[]) => {
         setEditMode('menu');
         await handleSave({
           tools: finalTools
         });
       }} />;
     case 'edit-color':
-      return <ColorPicker agentName={agent.agentType} currentColor={selectedColor || agent.color as AgentColorName || 'automatic'} onConfirm={async color => {
+      return <ColorPicker agentName={agent.agentType} currentColor={selectedColor || agent.color as AgentColorName || 'automatic'} onConfirm={async (color: AgentColorName | undefined) => {
         setSelectedColor(color);
         setEditMode('menu');
         await handleSave({
@@ -165,7 +165,7 @@ export function AgentEditor({
         });
       }} />;
     case 'edit-model':
-      return <ModelSelector initialModel={agent.model} onComplete={async model => {
+      return <ModelSelector initialModel={agent.model} onComplete={async (model?: string) => {
         setEditMode('menu');
         await handleSave({
           model

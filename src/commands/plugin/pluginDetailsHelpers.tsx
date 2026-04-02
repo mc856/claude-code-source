@@ -28,6 +28,9 @@ export type PluginDetailsMenuOption = {
   label: string;
   action: string;
 };
+type PluginSelectionKeyHintProps = {
+  hasSelection: boolean;
+};
 
 /**
  * Extract GitHub repo info from a plugin's source
@@ -76,7 +79,7 @@ export function buildPluginDetailsMenuOptions(hasHomepage: string | undefined, g
 /**
  * Key hint component for plugin selection screens
  */
-export function PluginSelectionKeyHint(t0) {
+export function PluginSelectionKeyHint(t0: PluginSelectionKeyHintProps) {
   const $ = _c(7);
   const {
     hasSelection

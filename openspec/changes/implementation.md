@@ -1091,3 +1091,212 @@ Observed result:
 With the Claude adapter regression suite now present, the focused validation requirement for Anthropic-compatible providers is sufficiently covered for the adapter refactor scope.
 
 `provider-abstraction/tasks.md` item `2.3` is now aligned with the executed validation state.
+
+## 2026-04-02 Debug Record: TypeScript Baseline Triage
+
+### Symptom
+
+Repository-level `tsc --noEmit` could not be used as a reliable validation step:
+- TypeScript 6 rejected the current `tsconfig.json` because `baseUrl` now requires explicit deprecation acknowledgement
+- after bypassing the TS6 deprecation gate, the source tree still failed on a mix of missing global types, missing declaration packages, and missing source entrypoints in the reconstructed tree
+
+At the same time, the bundled `cli.js` remained runnable, which indicated that the shipped runtime bundle was intact even though the reconstructed source tree was not yet type-checkable.
+
+### Decision
+
+Treat the TypeScript work as a separate baseline-repair pass rather than folding it into the already-completed provider changes.
+
+The repair strategy for this pass was:
+- first restore TS6/tooling compatibility so `tsc` can run meaningfully
+- then add narrow source-compatible shims for obviously missing entrypoints in the reconstructed tree
+- use the resulting error surface to separate "missing reconstructed source pieces" from "real source-level type errors"
+
+This intentionally prioritizes diagnosability over strictness in the shim files.
+
+### Fix
+
+Tooling baseline updates:
+- updated `tsconfig.json` to add:
+  - `ignoreDeprecations: "6.0"`
+  - explicit `lib` entries
+  - explicit `types` entries for Node/Bun compile-time globals
+- added compile-time dev dependencies in `package.json` / `bun.lock`:
+  - `typescript`
+  - `@types/node`
+  - `@types/react`
+  - `@types/react-dom`
+  - `@types/lodash-es`
+  - `bun-types`
+
+Reconstructed-source shim entrypoints added:
+- `src/global.d.ts`
+- `src/types/message.ts`
+- `src/entrypoints/sdk/controlTypes.ts`
+- `src/services/oauth/types.ts`
+- `src/assistant/index.ts`
+- `src/commands/workflows/index.ts`
+- `src/cli/transports/Transport.ts`
+- `src/proactive/index.ts`
+- `src/services/compact/reactiveCompact.ts`
+- `src/services/contextCollapse/index.ts`
+- `src/services/contextCollapse/operations.ts`
+- `src/services/skillSearch/localSearch.ts`
+- `src/commands/peers/index.ts`
+- `src/commands/fork/index.ts`
+- `src/commands/buddy/index.ts`
+- `src/tools/WorkflowTool/createWorkflowCommand.ts`
+- `src/utils/attributionHooks.ts`
+
+SDK entrypoint re-exports were also backfilled in `src/entrypoints/agentSdkTypes.ts` so the reconstructed tree exposes the type names referenced across CLI/bridge code.
+
+### Verification
+
+Executed TypeScript validation iteratively:
+- `./node_modules/.bin/tsc --noEmit -p tsconfig.json --pretty false`
+
+Observed progression:
+- initial failures were dominated by TS6 config gating, missing Node/React/Bun globals, missing declaration packages, and missing source entrypoints
+- after the baseline/tooling updates and shim entrypoints, those environment-level and missing-file failures were materially reduced
+- remaining first-page failures shifted primarily to real source-level typing issues in:
+  - `src/bridge/*`
+  - `src/cli/print.ts`
+  - various command/UI files with `unknown`, `never`, and implicit-`any` problems
+
+### Current Assessment
+
+This pass established a usable TypeScript triage baseline:
+- `tsc` now reflects the reconstructed source tree's real typing problems much more directly
+- the repository is no longer blocked first by TS6 config incompatibility or the most obvious missing-source entrypoints
+- the next repair phase should focus on actual type fixes, starting with the bridge transport/control-message files that now dominate the first-screen error output
+
+The bundled runtime remaining executable is consistent with this state: the runtime bundle is valid, but the reconstructed source tree still needs targeted type repair before repository-level `tsc --noEmit` can pass.
+
+### Progress Update
+
+Follow-up type-repair work has now removed another layer of non-business-logic failures:
+- restored `src/cli/handlers/util.tsx` as readable source instead of leaving the reconstructed tree with a deleted handler module
+- repaired bridge-side type flow in:
+  - `src/bridge/bridgeMessaging.ts`
+  - `src/bridge/inboundMessages.ts`
+  - `src/bridge/remoteBridgeCore.ts`
+  - `src/bridge/replBridge.ts`
+- cleaned low-cost transport/cache/task typing issues in:
+  - `src/cli/transports/WebSocketTransport.ts`
+  - `src/commands/clear/caches.ts`
+  - `src/commands/clear/conversation.ts`
+  - `src/tools/TungstenTool/TungstenTool.ts`
+- restored `src/buddy/useBuddyNotification.tsx` to maintainable handwritten React/TypeScript source
+
+Re-running:
+- `./node_modules/.bin/tsc --noEmit -p tsconfig.json --pretty false`
+
+now shows the first-screen failures concentrated in:
+- `src/buddy/CompanionSprite.tsx`
+- `src/cli/print.ts`
+- `src/commands/bridge/bridge.tsx`
+
+This confirms the baseline-repair phase is substantially complete. The remaining work is dominated by real source typing problems in larger reconstructed UI/command files rather than missing entrypoints or obvious environment/tooling gaps.
+
+### Ongoing TSC Repair Progress
+
+The next pass continued shrinking the first-screen TypeScript surface by fixing high-yield command files before moving into larger feature groups:
+- removed the remaining first-screen errors in:
+  - `src/commands/fast/fast.tsx`
+  - `src/commands/ide/ide.tsx`
+  - `src/commands/copy/copy.tsx`
+- normalized `fs/promises.readdir()` usage in `src/commands/insights.ts` to explicit `Dirent<string>[]` handling, which cleared the reconstructed-source `NonSharedBuffer` path/type mismatches
+
+After these repairs, the dominant remaining first-screen failures are no longer in the earlier bridge/print/fast/ide/copy/insights set. The error surface has moved primarily into:
+- `src/commands/install-github-app/*`
+- `src/commands/install.tsx`
+- `src/commands/login/login.tsx`
+
+This is the expected progression: the repository is now past the earlier baseline/tooling/bridge-command bottlenecks and into the next cluster of command-specific typing fixes.
+
+### Additional Command Cleanup
+
+Another repair pass removed several more first-screen command clusters:
+- `src/commands/install.tsx`
+- `src/commands/login/login.tsx`
+- the full `src/commands/install-github-app/*` group
+- `src/commands/mcp/*`
+- `src/commands/mobile/mobile.tsx`
+- `src/commands/model/model.tsx`
+
+Key changes in this phase:
+- added reconstructed shared typings for the GitHub App flow in `src/commands/install-github-app/types.ts`
+- restored missing ambient module declarations for `execa` and `@commander-js/extra-typings` in `src/global.d.ts`
+- typed React component props and state selectors across command files so `setState` / `useAppState` callbacks no longer collapse to implicit `any` / `unknown`
+
+This confirms that the current TSC surface has moved beyond the earlier command groups and is now concentrated in the larger plugin-management area.
+
+### Plugin Cluster And Next Frontiers
+
+The next repair pass closed the remaining first-screen plugin-management cluster:
+- tightened shared plugin/MCP item typing in:
+  - `src/commands/plugin/unifiedTypes.ts`
+- completed focused typing cleanup in:
+  - `src/commands/plugin/ManagePlugins.tsx`
+  - `src/commands/plugin/DiscoverPlugins.tsx`
+  - `src/commands/plugin/PluginOptionsDialog.tsx`
+  - `src/commands/plugin/PluginSettings.tsx`
+  - `src/commands/plugin/UnifiedInstalledCell.tsx`
+  - `src/commands/plugin/ValidatePlugin.tsx`
+
+This removed the earlier `plugin` first-screen blockers (`unknown` plugin/MCP payloads, implicit `any` callback parameters, and nullable state inference issues). After re-running:
+- `./node_modules/.bin/tsc --noEmit -p tsconfig.json --pretty false`
+
+the first-screen errors have advanced again and are now concentrated in the next command set:
+- `src/commands/rate-limit-options/rate-limit-options.tsx`
+- `src/commands/remote-setup/remote-setup.tsx`
+- `src/commands/resume/resume.tsx`
+- `src/commands/review/*`
+- `src/commands/session/session.tsx`
+- `src/commands/tag/tag.tsx`
+
+Follow-up cleanup has already started on that next layer by:
+- typing `src/commands/rate-limit-options/rate-limit-options.tsx` component props/state and select handlers
+- narrowing the local `execa` call shape and select callback typing in `src/commands/remote-setup/remote-setup.tsx`
+
+At this point the TypeScript repair effort is no longer blocked by plugin management. The remaining work is primarily repetitive command/component typing cleanup across the reconstructed UI surface.
+
+### Agents Wizard And Shared Wizard Types
+
+The latest TSC pass moved the first-screen frontier into the reconstructed agent-management UI, especially the interactive `/agents` menu and the new-agent wizard flow.
+
+Completed in this pass:
+- restored missing shared wizard typings in:
+  - `src/components/wizard/types.ts`
+- restored missing agent wizard state typing in:
+  - `src/components/agents/new-agent-creation/types.ts`
+- repaired the agent-management surface enough to move past the earlier top-level menu/list issues:
+  - `src/components/agents/AgentDetail.tsx`
+  - `src/components/agents/AgentNavigationFooter.tsx`
+  - `src/components/agents/AgentsList.tsx`
+  - `src/components/agents/AgentsMenu.tsx`
+  - `src/components/agents/ColorPicker.tsx`
+  - `src/components/agents/ModelSelector.tsx`
+  - `src/components/agents/AgentEditor.tsx`
+  - `src/components/agents/generateAgent.ts`
+- reintroduced explicit wizard generics and state typing across the new-agent flow:
+  - `src/components/agents/new-agent-creation/CreateAgentWizard.tsx`
+  - `src/components/agents/new-agent-creation/wizard-steps/ColorStep.tsx`
+  - `src/components/agents/new-agent-creation/wizard-steps/DescriptionStep.tsx`
+  - `src/components/agents/new-agent-creation/wizard-steps/LocationStep.tsx`
+  - `src/components/agents/new-agent-creation/wizard-steps/MemoryStep.tsx`
+  - `src/components/agents/new-agent-creation/wizard-steps/MethodStep.tsx`
+  - `src/components/agents/new-agent-creation/wizard-steps/ModelStep.tsx`
+  - `src/components/agents/new-agent-creation/wizard-steps/PromptStep.tsx`
+  - `src/components/agents/new-agent-creation/wizard-steps/ToolsStep.tsx`
+  - `src/components/agents/new-agent-creation/wizard-steps/TypeStep.tsx`
+  - `src/components/agents/new-agent-creation/wizard-steps/ConfirmStep.tsx`
+
+After re-running:
+- `./node_modules/.bin/tsc --noEmit -p tsconfig.json --pretty false`
+
+the error surface is no longer dominated by missing wizard modules or broad `unknown` propagation from `useWizard()`. The remaining first-screen issues in this area are now much narrower:
+- a few concrete `new-agent-creation` value-shape mismatches (`ColorStep`, `MemoryStep`, `ConfirmStep`, `ConfirmStepWrapper`)
+- the next major cluster in `src/components/agents/ToolSelector.tsx`
+- then broader reconstructed `src/components/*` typing cleanup
+
+This confirms another phase change in the repair work: the agent wizard is now past its missing-type-definition stage and into ordinary component-level typing fixes.

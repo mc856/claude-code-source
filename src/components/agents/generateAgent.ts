@@ -17,7 +17,7 @@ import {
 import { jsonParse } from '../../utils/slowOperations.js'
 import { asSystemPrompt } from '../../utils/systemPromptType.js'
 
-type GeneratedAgent = {
+export type GeneratedAgent = {
   identifier: string
   whenToUse: string
   systemPrompt: string
@@ -165,9 +165,9 @@ export async function generateAgent(
   })
 
   const textBlocks = response.message.content.filter(
-    (block): block is ContentBlock & { type: 'text' } => block.type === 'text',
+    (block: ContentBlock): block is ContentBlock & { type: 'text' } => block.type === 'text',
   )
-  const responseText = textBlocks.map(block => block.text).join('\n')
+  const responseText = textBlocks.map((block: ContentBlock & { type: 'text' }) => block.text).join('\n')
 
   let parsed: GeneratedAgent
   try {

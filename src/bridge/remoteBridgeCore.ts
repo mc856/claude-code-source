@@ -38,6 +38,10 @@ import { buildCCRv2SdkUrl } from './workSecret.js'
 import { toCompatSessionId } from './sessionIdCompat.js'
 import { FlushGate } from './flushGate.js'
 import { createTokenRefreshScheduler } from './jwtUtils.js'
+
+type BridgeWritableSDKMessage = SDKMessage & {
+  uuid?: string
+}
 import { getTrustedDeviceToken } from './trustedDevice.js'
 import {
   getEnvLessBridgeConfig,
@@ -812,11 +816,14 @@ export async function initEnvLessBridgeCore(
     },
     writeSdkMessages(messages: SDKMessage[]) {
       const filtered = messages.filter(
-        m => !m.uuid || !recentPostedUUIDs.has(m.uuid),
+        m =>
+          !(m as BridgeWritableSDKMessage).uuid ||
+          !recentPostedUUIDs.has((m as BridgeWritableSDKMessage).uuid!),
       )
       if (filtered.length === 0) return
       for (const msg of filtered) {
-        if (msg.uuid) recentPostedUUIDs.add(msg.uuid)
+        const uuid = (msg as BridgeWritableSDKMessage).uuid
+        if (uuid) recentPostedUUIDs.add(uuid)
       }
       const events = filtered.map(m => ({ ...m, session_id: sessionId }))
       void transport.writeBatch(events)

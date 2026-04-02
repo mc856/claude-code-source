@@ -20,6 +20,7 @@ import {
   isLocalAgentTask,
   type LocalAgentTaskState,
 } from '../../tasks/LocalAgentTask/LocalAgentTask.js'
+import type { TaskState } from '../../tasks/types.js'
 import { isLocalShellTask } from '../../tasks/LocalShellTask/guards.js'
 import { asAgentId } from '../../types/ids.js'
 import type { Message } from '../../types/message.js'
@@ -92,10 +93,10 @@ export async function clearConversation({
   // LocalMainSessionTask.ts startBackgroundSession.
   const preservedAgentIds = new Set<string>()
   const preservedLocalAgents: LocalAgentTaskState[] = []
-  const shouldKillTask = (task: AppState['tasks'][string]): boolean =>
+  const shouldKillTask = (task: TaskState): boolean =>
     'isBackgrounded' in task && task.isBackgrounded === false
   if (getAppState) {
-    for (const task of Object.values(getAppState().tasks)) {
+    for (const task of Object.values(getAppState().tasks) as TaskState[]) {
       if (shouldKillTask(task)) continue
       if (isLocalAgentTask(task)) {
         preservedAgentIds.add(task.agentId)
@@ -137,7 +138,9 @@ export async function clearConversation({
       // Partition tasks using the same predicate computed above:
       // kill+remove foreground tasks, preserve everything else.
       const nextTasks: AppState['tasks'] = {}
-      for (const [taskId, task] of Object.entries(prev.tasks)) {
+      for (const [taskId, task] of Object.entries(prev.tasks) as Array<
+        [string, TaskState]
+      >) {
         if (!shouldKillTask(task)) {
           nextTasks[taskId] = task
           continue

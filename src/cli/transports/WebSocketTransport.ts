@@ -1,5 +1,4 @@
 import type { StdoutMessage } from 'src/entrypoints/sdk/controlTypes.js'
-import type WsWebSocket from 'ws'
 import { logEvent } from '../../services/analytics/index.js'
 import { CircularBuffer } from '../../utils/CircularBuffer.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -69,6 +68,12 @@ type WebSocketLike = {
   close(): void
   send(data: string): void
   ping?(): void // Bun & ws both support this
+}
+
+type NodeWebSocketLike = WebSocketLike & {
+  on(event: string, listener: (...args: any[]) => void): void
+  off(event: string, listener: (...args: any[]) => void): void
+  upgradeReq?: { headers?: Record<string, string> }
 }
 
 export class WebSocketTransport implements Transport {
@@ -248,9 +253,7 @@ export class WebSocketTransport implements Transport {
     this.handleOpenEvent()
     if (!ws) return
     // Check for last-id in upgrade response headers (ws package only)
-    const nws = ws as unknown as WsWebSocket & {
-      upgradeReq?: { headers?: Record<string, string> }
-    }
+    const nws = ws as unknown as NodeWebSocketLike
     const upgradeResponse = nws.upgradeReq
     if (upgradeResponse?.headers?.['x-last-request-id']) {
       const serverLastId = upgradeResponse.headers['x-last-request-id']
@@ -368,7 +371,7 @@ export class WebSocketTransport implements Transport {
       // 'pong' is Bun-specific — not in DOM typings
       nws.removeEventListener('pong' as 'message', this.onPong)
     } else {
-      const nws = ws as unknown as WsWebSocket
+      const nws = ws as unknown as NodeWebSocketLike
       nws.off('open', this.onNodeOpen)
       nws.off('message', this.onNodeMessage)
       nws.off('error', this.onNodeError)

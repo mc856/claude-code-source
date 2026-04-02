@@ -41,7 +41,12 @@ export function registerMcpXaaIdpCommand(mcp: Command): void {
       '--callback-port <port>',
       'Fixed loopback callback port (only if IdP does not honor RFC 8252 port-any matching)',
     )
-    .action(options => {
+    .action((options: {
+      issuer: string
+      clientId: string
+      clientSecret?: boolean
+      callbackPort?: string
+    }) => {
       // Validate everything BEFORE any writes. An exit(1) mid-write leaves
       // settings configured but keychain missing — confusing state.
       // updateSettingsForSource doesn't schema-check on write; a non-URL
@@ -166,7 +171,10 @@ export function registerMcpXaaIdpCommand(mcp: Command): void {
       '--id-token <jwt>',
       'Write this pre-obtained id_token directly to cache, skipping the OIDC browser login',
     )
-    .action(async options => {
+    .action(async (options: {
+      force?: boolean
+      idToken?: string
+    }) => {
       const idp = getXaaIdpSettings()
       if (!idp) {
         return cliError(

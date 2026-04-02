@@ -13,6 +13,20 @@ import type {
   CallToolResult,
   ToolAnnotations,
 } from '@modelcontextprotocol/sdk/types.js'
+import type { z } from 'zod/v4'
+import type {
+  HookEventSchema,
+  HookInputSchema,
+  HookJSONOutputSchema,
+  McpServerConfigForProcessTransportSchema,
+  McpServerStatusSchema,
+  ModelInfoSchema,
+  ModelUsageSchema,
+  PermissionResultSchema,
+  PermissionUpdateSchema,
+  SDKStatusSchema,
+  SDKUserMessageReplaySchema,
+} from './sdk/coreSchemas.js'
 
 // Control protocol types for SDK builders (bridge subpath consumers)
 /** @alpha */
@@ -69,6 +83,25 @@ export type {
   ForkSessionResult,
   SDKSessionInfo,
 }
+
+export type HookEvent = z.infer<ReturnType<typeof HookEventSchema>>
+export type HookInput = z.infer<ReturnType<typeof HookInputSchema>>
+export type HookJSONOutput = z.infer<ReturnType<typeof HookJSONOutputSchema>>
+export type McpServerConfigForProcessTransport = z.infer<
+  ReturnType<typeof McpServerConfigForProcessTransportSchema>
+>
+export type McpServerStatus = z.infer<
+  ReturnType<typeof McpServerStatusSchema>
+>
+export type ModelInfo = z.infer<ReturnType<typeof ModelInfoSchema>>
+export type ModelUsage = z.infer<ReturnType<typeof ModelUsageSchema>>
+export type PermissionResult = z.infer<ReturnType<typeof PermissionResultSchema>>
+export type PermissionUpdate = z.infer<ReturnType<typeof PermissionUpdateSchema>>
+export type SDKStatus = z.infer<ReturnType<typeof SDKStatusSchema>>
+export type SDKUserMessageReplay = z.infer<
+  ReturnType<typeof SDKUserMessageReplaySchema>
+>
+export type RewindFilesResult = any
 
 export function tool<Schema extends AnyZodRawShape>(
   _name: string,

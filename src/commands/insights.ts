@@ -1,6 +1,7 @@
 import { execFileSync } from 'child_process'
 import { diffLines } from 'diff'
 import { constants as fsConstants } from 'fs'
+import type { Dirent } from 'fs'
 import {
   copyFile,
   mkdir,
@@ -120,9 +121,12 @@ const collectFromRemoteHost: (
           }
 
           const projectsDir = join(tempDir, 'projects')
-          let projectDirents: Awaited<ReturnType<typeof readdir>>
+          let projectDirents: Dirent<string>[]
           try {
-            projectDirents = await readdir(projectsDir, { withFileTypes: true })
+            projectDirents = await readdir(projectsDir, {
+              withFileTypes: true,
+              encoding: 'utf8',
+            })
           } catch {
             return result
           }
@@ -146,9 +150,12 @@ const collectFromRemoteHost: (
               }
 
               // Copy session files (skip existing)
-              let files: Awaited<ReturnType<typeof readdir>>
+              let files: Dirent<string>[]
               try {
-                files = await readdir(projectPath, { withFileTypes: true })
+                files = await readdir(projectPath, {
+                  withFileTypes: true,
+                  encoding: 'utf8',
+                })
               } catch {
                 return
               }
@@ -2755,9 +2762,12 @@ type LiteSessionInfo = {
 async function scanAllSessions(): Promise<LiteSessionInfo[]> {
   const projectsDir = getProjectsDir()
 
-  let dirents: Awaited<ReturnType<typeof readdir>>
+  let dirents: Dirent<string>[]
   try {
-    dirents = await readdir(projectsDir, { withFileTypes: true })
+    dirents = await readdir(projectsDir, {
+      withFileTypes: true,
+      encoding: 'utf8',
+    })
   } catch {
     return []
   }

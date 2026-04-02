@@ -23,6 +23,7 @@ import type { MCPServerConnection, McpClaudeAIProxyServerConfig, McpHTTPServerCo
 import { filterToolsByServer } from '../../services/mcp/utils.js';
 import { disablePluginOp, enablePluginOp, getPluginInstallationFromV2, isInstallableScope, isPluginEnabledAtProjectScope, uninstallPluginOp, updatePluginOp } from '../../services/plugins/pluginOperations.js';
 import { useAppState } from '../../state/AppState.js';
+import type { AppState } from '../../state/AppStateStore.js';
 import type { Tool } from '../../Tool.js';
 import type { LoadedPlugin, PluginError } from '../../types/plugin.js';
 import { count } from '../../utils/array.js';
@@ -404,9 +405,9 @@ export function ManagePlugins({
   action
 }: Props): React.ReactNode {
   // App state for MCP access
-  const mcpClients = useAppState(s => s.mcp.clients);
-  const mcpTools = useAppState(s_0 => s_0.mcp.tools);
-  const pluginErrors = useAppState(s_1 => s_1.plugins.errors);
+  const mcpClients = useAppState((s: AppState) => s.mcp.clients) as MCPServerConnection[];
+  const mcpTools = useAppState((s_0: AppState) => s_0.mcp.tools) as Tool[];
+  const pluginErrors = useAppState((s_1: AppState) => s_1.plugins.errors) as PluginError[];
   const flaggedPlugins = getFlaggedPlugins();
 
   // Search state
@@ -591,7 +592,7 @@ export function ManagePlugins({
     const matchedPluginNames = new Set(pluginsWithChildren.map(({
       item: item_0
     }) => item_0.name));
-    const orphanErrorsBySource = new Map<string, typeof pluginErrors>();
+    const orphanErrorsBySource = new Map<string, PluginError[]>();
     for (const error of pluginErrors) {
       if (matchedPluginIds.has(error.source) || 'plugin' in error && typeof error.plugin === 'string' && matchedPluginNames.has(error.plugin)) {
         continue;
@@ -695,7 +696,7 @@ export function ManagePlugins({
 
     // Add standalone MCPs to their respective scope groups
     for (const mcp of standaloneMcps) {
-      const scope_1 = mcp.scope;
+          const scope_1 = mcp.scope;
       if (!itemsByScope.has(scope_1)) {
         itemsByScope.set(scope_1, []);
       }
@@ -2152,7 +2153,7 @@ export function ManagePlugins({
 
       // Check if we need to show a scope header
       const prevItem = visibleIndex > 0 ? visibleItems[visibleIndex - 1] : null;
-      const showScopeHeader = !prevItem || prevItem.scope !== item_10.scope;
+          const showScopeHeader = !prevItem || prevItem.scope !== item_10.scope;
 
       // Get scope label
       const getScopeLabel = (scope_8: string): string => {

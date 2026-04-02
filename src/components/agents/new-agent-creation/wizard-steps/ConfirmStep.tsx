@@ -24,7 +24,7 @@ type Props = {
   onSaveAndEdit: () => void;
   error?: string | null;
 };
-export function ConfirmStep(t0) {
+export function ConfirmStep(t0: Props) {
   const $ = _c(88);
   const {
     tools,
@@ -36,7 +36,7 @@ export function ConfirmStep(t0) {
   const {
     goBack,
     wizardData
-  } = useWizard();
+  } = useWizard<AgentWizardData>();
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
     t1 = {
@@ -49,7 +49,7 @@ export function ConfirmStep(t0) {
   useKeybinding("confirm:no", goBack, t1);
   let t2;
   if ($[1] !== onSave || $[2] !== onSaveAndEdit) {
-    t2 = e => {
+    t2 = (e: KeyboardEvent) => {
       if (e.key === "s" || e.key === "return") {
         e.preventDefault();
         onSave();
@@ -67,7 +67,7 @@ export function ConfirmStep(t0) {
     t2 = $[3];
   }
   const handleKeyDown = t2;
-  const agent = wizardData.finalAgent;
+  const agent = wizardData.finalAgent!;
   let T0;
   let T1;
   let t10;

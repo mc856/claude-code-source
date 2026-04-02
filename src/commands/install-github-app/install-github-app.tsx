@@ -47,7 +47,7 @@ function InstallGitHubApp(props: {
   onDone: (message: string) => void;
 }): React.ReactNode {
   const [existingApiKey] = useState(() => getAnthropicApiKey());
-  const [state, setState] = useState({
+  const [state, setState] = useState<State>({
     ...INITIAL_STATE,
     useExistingKey: !!existingApiKey,
     selectedApiKeyOption: (existingApiKey ? 'existing' : isAnthropicAuthEnabled() ? 'oauth' : 'new') as 'existing' | 'new' | 'oauth'
@@ -558,7 +558,7 @@ function InstallGitHubApp(props: {
           <ErrorStep error={state.error} errorReason={state.errorReason} errorInstructions={state.errorInstructions} />
         </Box>;
     case 'select-workflows':
-      return <WorkflowMultiselectDialog defaultSelections={state.selectedWorkflows} onSubmit={selectedWorkflows => {
+      return <WorkflowMultiselectDialog defaultSelections={state.selectedWorkflows} onSubmit={(selectedWorkflows: Workflow[]) => {
         logEvent('tengu_install_github_app_step_completed', {
           step: 'select-workflows' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
         });

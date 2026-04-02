@@ -6,6 +6,7 @@ import { ModelPicker } from '../../components/ModelPicker.js';
 import { COMMON_HELP_ARGS, COMMON_INFO_ARGS } from '../../constants/xml.js';
 import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from '../../services/analytics/index.js';
 import { useAppState, useSetAppState } from '../../state/AppState.js';
+import type { AppState } from '../../state/AppStateStore.js';
 import type { LocalJSXCommandCall } from '../../types/command.js';
 import type { EffortLevel } from '../../utils/effort.js';
 import { isBilledAsExtraUsage } from '../../utils/extraUsage.js';
@@ -16,14 +17,17 @@ import { getDefaultMainLoopModelSetting, isOpus1mMergeEnabled, renderDefaultMode
 import { isModelAllowedForProvider } from '../../utils/model/modelAllowlist.js';
 import { getProviderConfig } from '../../services/providers/config.js';
 import { validateModel } from '../../utils/model/validateModel.js';
-function ModelPickerWrapper(t0) {
+import type { ModelSetting } from '../../utils/model/model.js';
+function ModelPickerWrapper(t0: {
+  onDone: (result?: string, options?: { display?: CommandResultDisplay }) => void;
+}) {
   const $ = _c(17);
   const {
     onDone
   } = t0;
-  const mainLoopModel = useAppState(_temp);
-  const mainLoopModelForSession = useAppState(_temp2);
-  const isFastMode = useAppState(_temp3);
+  const mainLoopModel = useAppState(_temp) as string | null;
+  const mainLoopModelForSession = useAppState(_temp2) as string | null;
+  const isFastMode = useAppState(_temp3) as boolean;
   const setAppState = useSetAppState();
   let t1;
   if ($[0] !== mainLoopModel || $[1] !== onDone) {
@@ -45,7 +49,7 @@ function ModelPickerWrapper(t0) {
   const handleCancel = t1;
   let t2;
   if ($[3] !== isFastMode || $[4] !== mainLoopModel || $[5] !== onDone || $[6] !== setAppState) {
-    t2 = function handleSelect(model, effort) {
+    t2 = function handleSelect(model: string | null, effort: EffortLevel | undefined) {
       logEvent("tengu_model_command_menu", {
         action: model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         from_model: mainLoopModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -113,19 +117,19 @@ function ModelPickerWrapper(t0) {
   }
   return t4;
 }
-function _temp4(prev_0) {
+function _temp4(prev_0: AppState) {
   return {
     ...prev_0,
     fastMode: false
   };
 }
-function _temp3(s_1) {
+function _temp3(s_1: AppState) {
   return s_1.fastMode;
 }
-function _temp2(s_0) {
+function _temp2(s_0: AppState) {
   return s_0.mainLoopModelForSession;
 }
-function _temp(s) {
+function _temp(s: AppState) {
   return s.mainLoopModel;
 }
 function SetModelAndClose({
@@ -137,7 +141,7 @@ function SetModelAndClose({
     display?: CommandResultDisplay;
   }) => void;
 }): React.ReactNode {
-  const isFastMode = useAppState(s => s.fastMode);
+  const isFastMode = useAppState((s: AppState) => s.fastMode) as boolean;
   const setAppState = useSetAppState();
   const model = args === 'default' ? null : args;
   React.useEffect(() => {
@@ -201,7 +205,7 @@ function SetModelAndClose({
       }
     }
     function setModel(modelValue: string | null): void {
-      setAppState(prev => ({
+      setAppState((prev: AppState) => ({
         ...prev,
         mainLoopModel: modelValue,
         mainLoopModelForSession: null
@@ -211,7 +215,7 @@ function SetModelAndClose({
       if (isFastModeEnabled()) {
         clearFastModeCooldown();
         if (!isFastModeSupportedByModel(modelValue) && isFastMode) {
-          setAppState(prev_0 => ({
+          setAppState((prev_0: AppState) => ({
             ...prev_0,
             fastMode: false
           }));
@@ -248,13 +252,15 @@ function isSonnet1mUnavailable(model: string): boolean {
   // a different access criteria.
   return !checkSonnet1mAccess() && (m.includes('sonnet[1m]') || m.includes('sonnet-4-6[1m]'));
 }
-function ShowModelAndClose(t0) {
+function ShowModelAndClose(t0: {
+  onDone: (result?: string) => void;
+}) {
   const {
     onDone
   } = t0;
-  const mainLoopModel = useAppState(_temp7);
-  const mainLoopModelForSession = useAppState(_temp8);
-  const effortValue = useAppState(_temp9);
+  const mainLoopModel = useAppState(_temp7) as ModelSetting;
+  const mainLoopModelForSession = useAppState(_temp8) as string | null;
+  const effortValue = useAppState(_temp9) as EffortLevel | undefined;
   const displayModel = renderModelLabel(mainLoopModel);
   const effortInfo = effortValue !== undefined ? ` (effort: ${effortValue})` : "";
   if (mainLoopModelForSession) {
@@ -264,13 +270,13 @@ function ShowModelAndClose(t0) {
   }
   return null;
 }
-function _temp9(s_1) {
+function _temp9(s_1: AppState) {
   return s_1.effortValue;
 }
-function _temp8(s_0) {
+function _temp8(s_0: AppState) {
   return s_0.mainLoopModelForSession;
 }
-function _temp7(s) {
+function _temp7(s: AppState) {
   return s.mainLoopModel;
 }
 export const call: LocalJSXCommandCall = async (onDone, _context, args) => {

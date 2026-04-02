@@ -10,6 +10,7 @@ import { useExitOnCtrlCDWithKeybindings } from '../../hooks/useExitOnCtrlCDWithK
 import { Box, Text } from '../../ink.js';
 import { useKeybinding, useKeybindings } from '../../keybindings/useKeybinding.js';
 import { useAppState, useSetAppState } from '../../state/AppState.js';
+import type { AppState } from '../../state/AppStateStore.js';
 import type { PluginError } from '../../types/plugin.js';
 import { errorMessage } from '../../utils/errors.js';
 import { clearAllCaches } from '../../utils/plugins/cacheUtils.js';
@@ -28,7 +29,15 @@ import { type ParsedCommand, parsePluginArgs } from './parseArgs.js';
 import type { PluginSettingsProps, ViewState } from './types.js';
 import { ValidatePlugin } from './ValidatePlugin.js';
 type TabId = 'discover' | 'installed' | 'marketplaces' | 'errors';
-function MarketplaceList(t0) {
+type MarketplaceListProps = {
+  onComplete: (result?: string) => void;
+};
+type ErrorsTabContentProps = {
+  setViewState: React.Dispatch<React.SetStateAction<ViewState>>;
+  setActiveTab: React.Dispatch<React.SetStateAction<TabId>>;
+  markPluginsChanged: () => void;
+};
+function MarketplaceList(t0: MarketplaceListProps) {
   const $ = _c(4);
   const {
     onComplete
@@ -72,7 +81,7 @@ function MarketplaceList(t0) {
   }
   return t3;
 }
-function _temp(n) {
+function _temp(n: string) {
   return `  • ${n}`;
 }
 function McpRedirectBanner() {
@@ -354,19 +363,22 @@ function removeExtraMarketplace(name: string, sources: Array<{
     }
   }
 }
-function ErrorsTabContent(t0) {
+function ErrorsTabContent(t0: ErrorsTabContentProps) {
   const $ = _c(26);
   const {
     setViewState,
     setActiveTab,
     markPluginsChanged
   } = t0;
-  const errors = useAppState(_temp2);
-  const installationStatus = useAppState(_temp3);
+  const errors = useAppState(_temp2) as PluginError[];
+  const installationStatus = useAppState(_temp3) as AppState['plugins']['installationStatus'];
   const setAppState = useSetAppState();
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [actionMessage, setActionMessage] = useState(null);
-  let t1;
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  let t1: Array<{
+    name: string;
+    error: string;
+  }>;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
     t1 = [];
     $[0] = t1;
@@ -374,8 +386,8 @@ function ErrorsTabContent(t0) {
     t1 = $[0];
   }
   const [marketplaceLoadFailures, setMarketplaceLoadFailures] = useState(t1);
-  let t2;
-  let t3;
+  let t2: () => void;
+  let t3: [];
   if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
     t2 = () => {
       (async () => {
@@ -450,10 +462,10 @@ function ErrorsTabContent(t0) {
             ...prev_0,
             plugins: {
               ...prev_0.plugins,
-              errors: prev_0.plugins.errors.filter(e_2 => !("marketplace" in e_2 && e_2.marketplace === action.name)),
+              errors: prev_0.plugins.errors.filter((e_2: PluginError) => !("marketplace" in e_2 && e_2.marketplace === action.name)),
               installationStatus: {
                 ...prev_0.plugins.installationStatus,
-                marketplaces: prev_0.plugins.installationStatus.marketplaces.filter(m_1 => m_1.name !== action.name)
+                marketplaces: prev_0.plugins.installationStatus.marketplaces.filter((m_1: AppState['plugins']['installationStatus']['marketplaces'][number]) => m_1.name !== action.name)
               }
             }
           }));
@@ -536,7 +548,7 @@ function ErrorsTabContent(t0) {
   const t10 = "column";
   let t11;
   if ($[11] !== clampedIndex) {
-    t11 = (row_0, idx) => {
+    t11 = (row_0: ErrorRow, idx: number) => {
       const isSelected = idx === clampedIndex;
       return <Box key={idx} marginLeft={1} flexDirection="column" marginBottom={1}><Text><Text color={isSelected ? "suggestion" : "error"}>{isSelected ? figures.pointer : figures.cross}{" "}</Text><Text bold={isSelected}>{row_0.label}</Text>{row_0.scope && <Text dimColor={true}> ({row_0.scope})</Text>}</Text><Box marginLeft={3}><Text color="error">{row_0.message}</Text></Box>{row_0.guidance && <Box marginLeft={3}><Text dimColor={true} italic={true}>{row_0.guidance}</Text></Box>}</Box>;
     };
@@ -597,13 +609,16 @@ function ErrorsTabContent(t0) {
   }
   return t18;
 }
-function _temp9(prev_1) {
+function _temp9(prev_1: number) {
   return Math.max(0, prev_1 - 1);
 }
-function _temp8(s_1) {
+function _temp8(s_1: {
+  source: EditableSettingSource;
+  scope: string;
+}) {
   return s_1.scope;
 }
-function _temp7(e_1) {
+function _temp7(e_1: PluginError) {
   if (isTransientError(e_1)) {
     return false;
   }
@@ -612,7 +627,7 @@ function _temp7(e_1) {
   }
   return getPluginNameFromError(e_1) === undefined;
 }
-function _temp6(e_0) {
+function _temp6(e_0: PluginError) {
   if (isTransientError(e_0)) {
     return false;
   }
@@ -621,16 +636,18 @@ function _temp6(e_0) {
   }
   return getPluginNameFromError(e_0) !== undefined;
 }
-function _temp5(m_0) {
+function _temp5(m_0: {
+  name: string;
+}) {
   return m_0.name;
 }
-function _temp4(m) {
+function _temp4(m: AppState['plugins']['installationStatus']['marketplaces'][number]) {
   return m.status === "failed";
 }
-function _temp3(s_0) {
+function _temp3(s_0: AppState) {
   return s_0.plugins.installationStatus;
 }
-function _temp2(s) {
+function _temp2(s: AppState) {
   return s.plugins.errors;
 }
 function getInitialViewState(parsedCommand: ParsedCommand): ViewState {
@@ -725,7 +742,7 @@ function getInitialTab(viewState: ViewState): TabId {
   if (viewState.type === 'manage-marketplaces') return 'marketplaces';
   return 'discover';
 }
-export function PluginSettings(t0) {
+export function PluginSettings(t0: PluginSettingsProps) {
   const $ = _c(75);
   const {
     onComplete,
@@ -757,11 +774,11 @@ export function PluginSettings(t0) {
   const [activeTab, setActiveTab] = useState(t2);
   const [inputValue, setInputValue] = useState(viewState.type === "add-marketplace" ? viewState.initialValue || "" : "");
   const [cursorOffset, setCursorOffset] = useState(0);
-  const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
   const [childSearchActive, setChildSearchActive] = useState(false);
   const setAppState = useSetAppState();
-  const pluginErrorCount = useAppState(_temp0);
+  const pluginErrorCount = useAppState(_temp0) as number;
   const errorsTabTitle = pluginErrorCount > 0 ? `Errors (${pluginErrorCount})` : "Errors";
   const exitState = useExitOnCtrlCDWithKeybindings();
   const cliMode = parsedCommand.type === "marketplace" && parsedCommand.action === "add" && parsedCommand.target !== undefined;
@@ -778,7 +795,7 @@ export function PluginSettings(t0) {
   const markPluginsChanged = t3;
   let t4;
   if ($[7] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = tabId => {
+    t4 = (tabId: string) => {
       const tab = tabId as TabId;
       setActiveTab(tab);
       setError(null);
@@ -1051,7 +1068,7 @@ export function PluginSettings(t0) {
   }
   return t27;
 }
-function _temp1(prev) {
+function _temp1(prev: AppState) {
   return prev.plugins.needsRefresh ? prev : {
     ...prev,
     plugins: {
@@ -1060,7 +1077,7 @@ function _temp1(prev) {
     }
   };
 }
-function _temp0(s) {
+function _temp0(s: AppState) {
   let count = s.plugins.errors.length;
   for (const m of s.plugins.installationStatus.marketplaces) {
     if (m.status === "failed") {

@@ -38,14 +38,17 @@ function applyFastMode(enable: boolean, setAppState: (f: (prev: AppState) => App
     }));
   }
 }
-export function FastModePicker(t0) {
+export function FastModePicker(t0: {
+  onDone: (result?: string, options?: { display?: CommandResultDisplay }) => void;
+  unavailableReason: string | null;
+}) {
   const $ = _c(30);
   const {
     onDone,
     unavailableReason
   } = t0;
-  const model = useAppState(_temp);
-  const initialFastMode = useAppState(_temp2);
+  const model = useAppState(_temp) as AppState['mainLoopModel'];
+  const initialFastMode = useAppState(_temp2) as boolean | undefined;
   const setAppState = useSetAppState();
   const [enableFastMode, setEnableFastMode] = useState(initialFastMode ?? false);
   let t1;
@@ -172,7 +175,10 @@ export function FastModePicker(t0) {
   const title = t8;
   let t9;
   if ($[20] !== isUnavailable) {
-    t9 = exitState => exitState.pending ? <Text>Press {exitState.keyName} again to exit</Text> : isUnavailable ? <Text>Esc to cancel</Text> : <Text>Tab to toggle · Enter to confirm · Esc to cancel</Text>;
+    t9 = (exitState: {
+      pending: boolean;
+      keyName?: string | null;
+    }) => exitState.pending ? <Text>Press {exitState.keyName} again to exit</Text> : isUnavailable ? <Text>Esc to cancel</Text> : <Text>Tab to toggle · Enter to confirm · Esc to cancel</Text>;
     $[20] = isUnavailable;
     $[21] = t9;
   } else {
@@ -208,19 +214,19 @@ export function FastModePicker(t0) {
   }
   return t12;
 }
-function _temp4(prev_0) {
+function _temp4(prev_0: boolean) {
   return !prev_0;
 }
-function _temp3(prev) {
+function _temp3(prev: AppState) {
   return {
     ...prev,
     fastMode: false
   };
 }
-function _temp2(s_0) {
+function _temp2(s_0: AppState) {
   return s_0.fastMode;
 }
-function _temp(s) {
+function _temp(s: AppState) {
   return s.mainLoopModel;
 }
 async function handleFastModeShortcut(enable: boolean, getAppState: () => AppState, setAppState: (f: (prev: AppState) => AppState) => void): Promise<string> {

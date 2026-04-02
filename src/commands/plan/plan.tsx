@@ -11,7 +11,13 @@ import { prepareContextForPlanMode } from '../../utils/permissions/permissionSet
 import { getPlan, getPlanFilePath } from '../../utils/plans.js';
 import { editFileInEditor } from '../../utils/promptEditor.js';
 import { renderToString } from '../../utils/staticRender.js';
-function PlanDisplay(t0) {
+import type { AppState } from '../../state/AppStateStore.js';
+type PlanDisplayProps = {
+  planContent: string;
+  planPath: string;
+  editorName?: string;
+};
+function PlanDisplay(t0: PlanDisplayProps) {
   const $ = _c(11);
   const {
     planContent,
@@ -72,7 +78,7 @@ export async function call(onDone: LocalJSXCommandOnDone, context: LocalJSXComma
   // If not in plan mode, enable it
   if (currentMode !== 'plan') {
     handlePlanModeTransition(currentMode, 'plan');
-    setAppState(prev => ({
+    setAppState((prev: AppState) => ({
       ...prev,
       toolPermissionContext: applyPermissionUpdate(prepareContextForPlanMode(prev.toolPermissionContext), {
         type: 'setMode',

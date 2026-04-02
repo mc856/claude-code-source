@@ -12,7 +12,11 @@ import { logEvent } from '../../services/analytics/index.js';
 import type { LocalJSXCommandOnDone } from '../../types/command.js';
 import { recursivelySanitizeUnicode } from '../../utils/sanitization.js';
 import { getCurrentSessionTag, getTranscriptPath, saveTag } from '../../utils/sessionStorage.js';
-function ConfirmRemoveTag(t0) {
+function ConfirmRemoveTag(t0: {
+  tagName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
   const $ = _c(11);
   const {
     tagName,
@@ -29,7 +33,7 @@ function ConfirmRemoveTag(t0) {
   }
   let t3;
   if ($[1] !== onCancel || $[2] !== onConfirm) {
-    t3 = value => value === "yes" ? onConfirm() : onCancel();
+    t3 = (value: 'yes' | 'no') => value === "yes" ? onConfirm() : onCancel();
     $[1] = onCancel;
     $[2] = onConfirm;
     $[3] = t3;
@@ -69,14 +73,19 @@ function ConfirmRemoveTag(t0) {
   }
   return t6;
 }
-function ToggleTagAndClose(t0) {
+function ToggleTagAndClose(t0: {
+  tagName: string;
+  onDone: (result?: string, options?: {
+    display?: CommandResultDisplay;
+  }) => void;
+}) {
   const $ = _c(17);
   const {
     tagName,
     onDone
   } = t0;
   const [showConfirm, setShowConfirm] = React.useState(false);
-  const [sessionId, setSessionId] = React.useState(null);
+  const [sessionId, setSessionId] = React.useState<UUID | null>(null);
   let t1;
   if ($[0] !== tagName) {
     t1 = recursivelySanitizeUnicode(tagName).trim();
@@ -178,7 +187,11 @@ function ToggleTagAndClose(t0) {
   }
   return null;
 }
-function ShowHelp(t0) {
+function ShowHelp(t0: {
+  onDone: (result?: string, options?: {
+    display?: CommandResultDisplay;
+  }) => void;
+}) {
   const $ = _c(3);
   const {
     onDone

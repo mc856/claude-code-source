@@ -310,6 +310,16 @@ import {
   restoreSessionStateFromLog,
 } from 'src/utils/sessionRestore.js'
 import { SandboxManager } from 'src/utils/sandbox/sandbox-adapter.js'
+
+type HookRequestMatcher = {
+  matcher?: string
+  hookCallbackIds: string[]
+  timeout?: number
+}
+
+type NamedTeammate = {
+  name: string
+}
 import {
   headlessProfilerStartTurn,
   headlessProfilerCheckpoint,
@@ -797,7 +807,7 @@ export async function runHeadless(
     appState.mcp.tools,
     appState.toolPermissionContext,
   )
-  let filteredTools = [...tools, ...allowedMcpTools]
+  let filteredTools: Tools = [...tools, ...allowedMcpTools] as Tools
 
   // When using SDK URL, always use stdio permission prompting to delegate to the SDK
   const effectivePermissionPromptToolName = options.sdkUrl
@@ -935,9 +945,9 @@ export async function runHeadless(
       switch (lastMessage.subtype) {
         case 'success':
           writeToStdout(
-            lastMessage.result.endsWith('\n')
-              ? lastMessage.result
-              : lastMessage.result + '\n',
+            (lastMessage.result as string).endsWith('\n')
+              ? (lastMessage.result as string)
+              : (lastMessage.result as string) + '\n',
           )
           break
         case 'error_during_execution':
@@ -1443,7 +1453,7 @@ function runHeadlessStreaming(
           ...prev.mcp,
           tools: [
             ...prev.mcp.tools.filter(
-              t =>
+              (t: Tool) =>
                 !allSdkNames.some(name =>
                   t.name.startsWith(getMcpPrefix(name)),
                 ),
@@ -1586,7 +1596,7 @@ function runHeadlessStreaming(
             ...prev.mcp,
             tools: [
               ...prev.mcp.tools.filter(
-                t =>
+                (t: Tool) =>
                   !allSdkNames.some(name =>
                     t.name.startsWith(getMcpPrefix(name)),
                   ),
@@ -1617,7 +1627,7 @@ function runHeadlessStreaming(
       'name',
     )
     const existingNames = new Set([
-      ...currentMcpClients.map(c => c.name),
+      ...currentMcpClients.map((c: MCPServerConnection) => c.name),
       ...sdkClients.map(c => c.name),
     ])
     return [
@@ -2553,8 +2563,13 @@ function runHeadlessStreaming(
 
                 // Find the teammate ID by name
                 const teammateId = refreshedState.teamContext?.teammates
-                  ? Object.entries(refreshedState.teamContext.teammates).find(
-                      ([, t]) => t.name === teammateToRemove,
+                  ? Object.entries(
+                      refreshedState.teamContext.teammates as Record<
+                        string,
+                        NamedTeammate
+                      >,
+                    ).find(([, t]: [string, NamedTeammate]) =>
+                      t.name === teammateToRemove,
                     )?.[0]
                   : undefined
 
@@ -3144,7 +3159,9 @@ function runHeadlessStreaming(
             mcpClients.find(c => c.name === serverName)?.config ??
             sdkClients.find(c => c.name === serverName)?.config ??
             dynamicMcpState.clients.find(c => c.name === serverName)?.config ??
-            currentAppState.mcp.clients.find(c => c.name === serverName)
+            currentAppState.mcp.clients.find(
+              (c: MCPServerConnection) => c.name === serverName,
+            )
               ?.config ??
             null
           if (!config) {
@@ -3157,7 +3174,7 @@ function runHeadlessStreaming(
               ...prev,
               mcp: {
                 ...prev.mcp,
-                clients: prev.mcp.clients.map(c =>
+                clients: prev.mcp.clients.map((c: MCPServerConnection) =>
                   c.name === serverName ? result.client : c,
                 ),
                 tools: [
@@ -3165,7 +3182,7 @@ function runHeadlessStreaming(
                   ...result.tools,
                 ],
                 commands: [
-                  ...reject(prev.mcp.commands, c =>
+                  ...reject(prev.mcp.commands, (c: Command) =>
                     commandBelongsToServer(c, serverName),
                   ),
                   ...result.commands,
@@ -3215,7 +3232,9 @@ function runHeadlessStreaming(
             mcpClients.find(c => c.name === serverName)?.config ??
             sdkClients.find(c => c.name === serverName)?.config ??
             dynamicMcpState.clients.find(c => c.name === serverName)?.config ??
-            currentAppState.mcp.clients.find(c => c.name === serverName)
+            currentAppState.mcp.clients.find(
+              (c: MCPServerConnection) => c.name === serverName,
+            )
               ?.config ??
             null
 
@@ -3239,13 +3258,13 @@ function runHeadlessStreaming(
               ...prev,
               mcp: {
                 ...prev.mcp,
-                clients: prev.mcp.clients.map(c =>
+                clients: prev.mcp.clients.map((c: MCPServerConnection) =>
                   c.name === serverName
                     ? { name: serverName, type: 'disabled' as const, config }
                     : c,
                 ),
                 tools: reject(prev.mcp.tools, t => t.name?.startsWith(prefix)),
-                commands: reject(prev.mcp.commands, c =>
+                commands: reject(prev.mcp.commands, (c: Command) =>
                   commandBelongsToServer(c, serverName),
                 ),
                 resources: omit(prev.mcp.resources, serverName),
@@ -3263,7 +3282,7 @@ function runHeadlessStreaming(
               ...prev,
               mcp: {
                 ...prev.mcp,
-                clients: prev.mcp.clients.map(c =>
+                clients: prev.mcp.clients.map((c: MCPServerConnection) =>
                   c.name === serverName ? result.client : c,
                 ),
                 tools: [
@@ -3271,7 +3290,7 @@ function runHeadlessStreaming(
                   ...result.tools,
                 ],
                 commands: [
-                  ...reject(prev.mcp.commands, c =>
+                  ...reject(prev.mcp.commands, (c: Command) =>
                     commandBelongsToServer(c, serverName),
                   ),
                   ...result.commands,
@@ -3313,7 +3332,9 @@ function runHeadlessStreaming(
           const config =
             getMcpConfigByName(serverName) ??
             mcpClients.find(c => c.name === serverName)?.config ??
-            currentAppState.mcp.clients.find(c => c.name === serverName)
+            currentAppState.mcp.clients.find(
+              (c: MCPServerConnection) => c.name === serverName,
+            )
               ?.config ??
             null
           if (!config) {
@@ -3398,7 +3419,7 @@ function runHeadlessStreaming(
                     ...prev,
                     mcp: {
                       ...prev.mcp,
-                      clients: prev.mcp.clients.map(c =>
+                      clients: prev.mcp.clients.map((c: MCPServerConnection) =>
                         c.name === serverName ? result.client : c,
                       ),
                       tools: [
@@ -3408,7 +3429,7 @@ function runHeadlessStreaming(
                         ...result.tools,
                       ],
                       commands: [
-                        ...reject(prev.mcp.commands, c =>
+                        ...reject(prev.mcp.commands, (c: Command) =>
                           commandBelongsToServer(c, serverName),
                         ),
                         ...result.commands,
@@ -3654,7 +3675,9 @@ function runHeadlessStreaming(
           const config =
             getMcpConfigByName(serverName) ??
             mcpClients.find(c => c.name === serverName)?.config ??
-            currentAppState.mcp.clients.find(c => c.name === serverName)
+            currentAppState.mcp.clients.find(
+              (c: MCPServerConnection) => c.name === serverName,
+            )
               ?.config ??
             null
           if (!config) {
@@ -3672,7 +3695,7 @@ function runHeadlessStreaming(
               ...prev,
               mcp: {
                 ...prev.mcp,
-                clients: prev.mcp.clients.map(c =>
+                clients: prev.mcp.clients.map((c: MCPServerConnection) =>
                   c.name === serverName ? result.client : c,
                 ),
                 tools: [
@@ -3680,7 +3703,7 @@ function runHeadlessStreaming(
                   ...result.tools,
                 ],
                 commands: [
-                  ...reject(prev.mcp.commands, c =>
+                  ...reject(prev.mcp.commands, (c: Command) =>
                     commandBelongsToServer(c, serverName),
                   ),
                   ...result.commands,
@@ -4434,16 +4457,20 @@ async function handleInitializeRequest(
   const accountInfo = getAccountInformation()
   if (request.hooks) {
     const hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>> = {}
-    for (const [event, matchers] of Object.entries(request.hooks)) {
-      hooks[event as HookEvent] = matchers.map(matcher => {
-        const callbacks = matcher.hookCallbackIds.map(callbackId => {
-          return structuredIO.createHookCallback(callbackId, matcher.timeout)
-        })
-        return {
-          matcher: matcher.matcher,
-          hooks: callbacks,
-        }
-      })
+    for (const [event, matchers] of Object.entries(
+      request.hooks as Record<string, HookRequestMatcher[]>,
+    )) {
+      hooks[event as HookEvent] = matchers.map(
+        (matcher: HookRequestMatcher): HookCallbackMatcher => {
+          const callbacks = matcher.hookCallbackIds.map((callbackId: string) => {
+            return structuredIO.createHookCallback(callbackId, matcher.timeout)
+          })
+          return {
+            matcher: matcher.matcher,
+            hooks: callbacks,
+          }
+        },
+      )
     }
     registerHookCallbacks(hooks)
   }
@@ -5563,7 +5590,7 @@ export async function reconcileMcpServers(
     ])
 
     // Remove old dynamic tools
-    const nonDynamicTools = prev.mcp.tools.filter(t => {
+    const nonDynamicTools = prev.mcp.tools.filter((t: Tool) => {
       for (const serverName of allDynamicServerNames) {
         if (t.name.startsWith(`mcp__${serverName}__`)) {
           return false
@@ -5573,9 +5600,11 @@ export async function reconcileMcpServers(
     })
 
     // Remove old dynamic clients
-    const nonDynamicClients = prev.mcp.clients.filter(c => {
+    const nonDynamicClients = prev.mcp.clients.filter(
+      (c: MCPServerConnection) => {
       return !allDynamicServerNames.has(c.name)
-    })
+      },
+    )
 
     return {
       ...prev,

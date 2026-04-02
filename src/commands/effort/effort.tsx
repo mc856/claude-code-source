@@ -3,6 +3,7 @@ import * as React from 'react';
 import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
 import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from '../../services/analytics/index.js';
 import { useAppState, useSetAppState } from '../../state/AppState.js';
+import type { AppState } from '../../state/AppStateStore.js';
 import type { LocalJSXCommandOnDone } from '../../types/command.js';
 import { type EffortValue, getDisplayedEffortLevel, getEffortEnvOverride, getEffortValueDescription, isEffortLevel, toPersistableEffort } from '../../utils/effort.js';
 import { updateSettingsForSource } from '../../utils/settings/settings.js';
@@ -116,7 +117,7 @@ export function executeEffort(args: string): EffortCommandResult {
   }
   return setEffortValue(normalized);
 }
-function ShowCurrentEffort(t0) {
+function ShowCurrentEffort(t0: { onDone: (result: string) => void }) {
   const {
     onDone
   } = t0;
@@ -128,10 +129,13 @@ function ShowCurrentEffort(t0) {
   onDone(message);
   return null;
 }
-function _temp(s) {
+function _temp(s: AppState) {
   return s.effortValue;
 }
-function ApplyEffortAndClose(t0) {
+function ApplyEffortAndClose(t0: {
+  result: EffortCommandResult;
+  onDone: (result: string) => void;
+}) {
   const $ = _c(6);
   const {
     result,
@@ -147,7 +151,7 @@ function ApplyEffortAndClose(t0) {
   if ($[0] !== effortUpdate || $[1] !== message || $[2] !== onDone || $[3] !== setAppState) {
     t1 = () => {
       if (effortUpdate) {
-        setAppState(prev => ({
+        setAppState((prev: AppState) => ({
           ...prev,
           effortValue: effortUpdate.value
         }));
