@@ -37,7 +37,7 @@ export function GroupedToolUseContent({
       }
     }
   }
-  const toolUsesData = message.messages.map(msg => {
+  const toolUsesData = message.messages.map((msg: typeof message.messages[number]) => {
     const content = msg.message.content[0];
     const result = resultsByToolUseId.get(content.id);
     return {
@@ -49,7 +49,7 @@ export function GroupedToolUseContent({
       result
     };
   });
-  const anyInProgress = toolUsesData.some(d => d.isInProgress);
+  const anyInProgress = toolUsesData.some((d: typeof toolUsesData[number]) => d.isInProgress);
   return tool.renderGroupedToolUse(toolUsesData, {
     shouldAnimate: shouldAnimate && anyInProgress,
     tools

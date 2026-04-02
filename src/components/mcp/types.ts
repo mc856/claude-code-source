@@ -1,6 +1,5 @@
 import type { Tool } from '../../Tool.js';
 import type {
-  AgentMcpServer,
   MCPServerConnection,
   McpClaudeAIProxyServerConfig,
   McpHTTPServerConfig,
@@ -43,7 +42,15 @@ export type ServerInfo =
   | HTTPServerInfo
   | ClaudeAIServerInfo;
 
-export type AgentMcpServerInfo = AgentMcpServer;
+export type AgentMcpServerInfo = {
+  name: string;
+  sourceAgents: string[];
+  transport: 'stdio' | 'sse' | 'http' | 'ws';
+  needsAuth: boolean;
+  isAuthenticated?: boolean;
+  url?: string;
+  command?: string;
+};
 
 export type MCPViewState =
   | {

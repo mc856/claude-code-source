@@ -1481,3 +1481,45 @@ The current first-screen frontier has now moved into the hooks configuration UI:
 - `src/components/hooks/SelectMatcherMode.tsx`
 
 This is another good phase boundary: the remaining first-screen errors are now concentrated in one module family instead of shared layout/search/rendering components.
+
+### Message Stack and Type Baseline Recovery
+
+I continued the TypeScript baseline cleanup through the message rendering stack and used `cli.js.map` source restoration where encoding damage blocked direct patching.
+
+- restored from `cli.js.map` and retyped:
+  - `src/components/MessageResponse.tsx`
+  - `src/components/messages/SystemAPIErrorMessage.tsx`
+  - `src/components/messages/SystemTextMessage.tsx`
+- fixed message rendering / lookups / progress typing in:
+  - `src/components/MessageRow.tsx`
+  - `src/components/Messages.tsx`
+  - `src/components/messageActions.tsx`
+  - `src/components/messages/AssistantToolUseMessage.tsx`
+  - `src/components/messages/CollapsedReadSearchContent.tsx`
+  - `src/components/messages/GroupedToolUseContent.tsx`
+  - `src/components/messages/AttachmentMessage.tsx`
+  - `src/components/messages/PlanApprovalMessage.tsx`
+  - `src/components/messages/RateLimitMessage.tsx`
+  - `src/components/messages/ShutdownMessage.tsx`
+  - `src/components/messages/nullRenderingAttachments.ts`
+- fixed message-specific helper/render components:
+  - `src/components/messages/teamMemCollapsed.tsx`
+  - `src/components/messages/UserBashOutputMessage.tsx`
+  - `src/components/messages/UserLocalCommandOutputMessage.tsx`
+  - `src/components/messages/UserResourceUpdateMessage.tsx`
+  - `src/components/messages/UserTeammateMessage.tsx`
+  - `src/components/messages/UserToolResultMessage/utils.tsx`
+- added minimal missing shims so reconstructed imports can type-check:
+  - `src/components/messages/UserGitHubWebhookMessage.tsx`
+  - `src/components/messages/UserForkBoilerplateMessage.tsx`
+  - `src/components/messages/UserCrossSessionMessage.tsx`
+
+After this pass, the first-screen `tsc` errors moved off the message stack and into the next shared UI layer. The current leading frontier is now concentrated in:
+- `src/components/MessageSelector.tsx`
+- `src/components/MessageTimestamp.tsx`
+- `src/components/ModelPicker.tsx`
+- `src/components/NativeAutoUpdater.tsx`
+- `src/components/Onboarding.tsx`
+- `src/components/OutputStylePicker.tsx`
+
+This is another useful phase boundary: the repository is no longer blocked by message rendering or attachment/type-recovery issues, and the remaining first-screen errors are now centered in reusable selection/picker/onboarding components.

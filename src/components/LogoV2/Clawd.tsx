@@ -70,11 +70,11 @@ const APPLE_EYES: Record<ClawdPose, string> = {
   'look-right': ' ▝   ▝ ',
   'arms-up': ' ▗   ▖ '
 };
-export function Clawd(t0) {
+export function Clawd(t0: Props | undefined) {
   const $ = _c(26);
   let t1;
   if ($[0] !== t0) {
-    t1 = t0 === undefined ? {} : t0;
+    t1 = t0 === undefined ? ({} as Props) : t0;
     $[0] = t0;
     $[1] = t1;
   } else {
@@ -83,7 +83,7 @@ export function Clawd(t0) {
   const {
     pose: t2
   } = t1;
-  const pose = t2 === undefined ? "default" : t2;
+  const pose: ClawdPose = t2 === undefined ? "default" : t2;
   if (env.terminal === "Apple_Terminal") {
     let t3;
     if ($[2] !== pose) {
@@ -180,7 +180,7 @@ export function Clawd(t0) {
   }
   return t12;
 }
-function AppleTerminalClawd(t0) {
+function AppleTerminalClawd(t0: { pose: ClawdPose }) {
   const $ = _c(10);
   const {
     pose

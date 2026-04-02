@@ -17,7 +17,7 @@ export function MCPServerApprovalDialog(t0: Props) {
   } = t0;
   let t1;
   if ($[0] !== onDone || $[1] !== serverName) {
-    t1 = function onChange(value) {
+    t1 = function onChange(value: 'yes' | 'yes_all' | 'no') {
       logEvent("tengu_mcp_dialog_choice", {
         choice: value as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
       });

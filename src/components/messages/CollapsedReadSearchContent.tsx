@@ -38,8 +38,52 @@ type Props = {
   isActiveGroup?: boolean;
 };
 
+type VerboseToolUseProps = {
+  content: {
+    type: 'tool_use';
+    id: string;
+    name: string;
+    input: unknown;
+  };
+  tools: Tools;
+  lookups: ReturnType<typeof buildMessageLookups>;
+  inProgressToolUseIDs: Set<string>;
+  shouldAnimate: boolean;
+  theme: ThemeName;
+};
+
+type HookInfo = {
+  command: string;
+  durationMs?: number;
+};
+
+type RelevantMemory = {
+  path: string;
+  content: string;
+};
+
+type CommitInfo = {
+  kind: 'committed' | 'amended' | 'cherry-picked';
+  sha: string;
+};
+
+type PushInfo = {
+  branch: string;
+};
+
+type BranchInfo = {
+  action: 'merged' | 'rebased';
+  ref: string;
+};
+
+type PullRequestInfo = {
+  action: 'created' | 'edited' | 'merged' | 'commented' | 'closed' | 'ready';
+  number: number;
+  url?: string;
+};
+
 /** Render a single tool use in verbose mode */
-function VerboseToolUse(t0) {
+function VerboseToolUse(t0: VerboseToolUseProps) {
   const $ = _c(24);
   const {
     content,
@@ -239,12 +283,12 @@ export function CollapsedReadSearchContent({
               {message.hookCount === 1 ? 'hook' : 'hooks'} (
               {formatSecondsShort(message.hookTotalMs ?? 0)})
             </Text>
-            {message.hookInfos.map((info, idx) => <Text key={`hook-${idx}`} dimColor>
+            {message.hookInfos.map((info: HookInfo, idx: number) => <Text key={`hook-${idx}`} dimColor>
                 {'     ⎿ '}
                 {info.command} ({formatSecondsShort(info.durationMs ?? 0)})
               </Text>)}
           </>}
-        {message.relevantMemories?.map(m => <Box key={m.path} flexDirection="column" marginTop={1}>
+        {message.relevantMemories?.map((m: RelevantMemory) => <Box key={m.path} flexDirection="column" marginTop={1}>
             <Text dimColor>
               {'  ⎿  '}Recalled {basename(m.path)}
             </Text>
@@ -310,14 +354,14 @@ export function CollapsedReadSearchContent({
       'cherry-picked': 'cherry-picked'
     };
     for (const kind of ['committed', 'amended', 'cherry-picked'] as const) {
-      const shas = message.commits.filter(c => c.kind === kind).map(c_0 => c_0.sha);
+      const shas = message.commits.filter((c: CommitInfo) => c.kind === kind).map((c_0: CommitInfo) => c_0.sha);
       if (shas.length) {
         pushPart(kind, byKind[kind], <Text bold>{shas.join(', ')}</Text>);
       }
     }
   }
   if (isFullscreenEnvEnabled() && message.pushes?.length) {
-    const branches = uniq(message.pushes.map(p => p.branch));
+    const branches = uniq(message.pushes.map((p: PushInfo) => p.branch));
     pushPart('push', 'pushed to', <Text bold>{branches.join(', ')}</Text>);
   }
   if (isFullscreenEnvEnabled() && message.branches?.length) {
@@ -325,7 +369,7 @@ export function CollapsedReadSearchContent({
       merged: 'merged',
       rebased: 'rebased onto'
     };
-    for (const b of message.branches) {
+    for (const b of message.branches as BranchInfo[]) {
       pushPart(`br-${b.action}-${b.ref}`, byAction[b.action], <Text bold>{b.ref}</Text>);
     }
   }
@@ -338,7 +382,7 @@ export function CollapsedReadSearchContent({
       closed: 'closed',
       ready: 'marked ready'
     };
-    for (const pr of message.prs) {
+    for (const pr of message.prs as PullRequestInfo[]) {
       pushPart(`pr-${pr.action}-${pr.number}`, verbs[pr.action], pr.url ? <PrBadge number={pr.number} url={pr.url} bold /> : <Text bold>PR #{pr.number}</Text>);
     }
   }
@@ -386,7 +430,7 @@ export function CollapsedReadSearchContent({
       </Text>);
   }
   if (mcpCallCount > 0) {
-    const serverLabel = message.mcpServerNames?.map(n => n.replace(/^claude\.ai /, '')).join(', ') || 'MCP';
+    const serverLabel = message.mcpServerNames?.map((n: string) => n.replace(/^claude\.ai /, '')).join(', ') || 'MCP';
     const isFirst_3 = nonMemParts.length === 0;
     const verb_0 = isActiveGroup ? isFirst_3 ? 'Querying' : 'querying' : isFirst_3 ? 'Queried' : 'queried';
     if (!isFirst_3) {
@@ -468,7 +512,7 @@ export function CollapsedReadSearchContent({
             <Text dimColor>{'  ⎿  '}</Text>
           </Box>
           <Box flexDirection="column" flexGrow={1}>
-            {displayedHint.split('\n').map((line, i, arr) => <Text key={`hint-${i}`} dimColor>
+            {displayedHint.split('\n').map((line: string, i: number, arr: string[]) => <Text key={`hint-${i}`} dimColor>
                 {line}
                 {i === arr.length - 1 && shellProgressSuffix}
               </Text>)}

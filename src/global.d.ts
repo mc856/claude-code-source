@@ -18,6 +18,11 @@ declare module 'figures' {
   export default figures
 }
 
+declare module 'fuse.js' {
+  const Fuse: any
+  export default Fuse
+}
+
 declare module 'p-map' {
   const pMap: any
   export default pMap
@@ -34,6 +39,25 @@ declare module 'qrcode' {
 declare module 'ws' {
   const WebSocket: any
   export default WebSocket
+}
+
+declare module 'strip-ansi' {
+  export default function stripAnsi(value: string): string
+}
+
+declare module '../services/compact/snipProjection.js' {
+  export function isSnipBoundaryMessage(message: unknown): boolean
+}
+
+declare module '../services/compact/snipCompact.js' {
+  export function isSnipMarkerMessage(message: unknown): boolean
+}
+
+declare module './messages/SnipBoundaryMessage.js' {
+  import type * as React from 'react'
+  export const SnipBoundaryMessage: React.ComponentType<{
+    message: unknown
+  }>
 }
 
 declare module '@anthropic-ai/claude-agent-sdk' {

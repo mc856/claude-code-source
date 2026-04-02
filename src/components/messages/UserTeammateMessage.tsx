@@ -147,7 +147,13 @@ type TeammateMessageContentProps = {
   summary?: string;
   isTranscriptMode?: boolean;
 };
-export function TeammateMessageContent(t0) {
+export function TeammateMessageContent(t0: {
+  displayName: string;
+  inkColor?: TextProps['color'];
+  content: string;
+  summary?: string;
+  isTranscriptMode?: boolean;
+}) {
   const $ = _c(14);
   const {
     displayName,

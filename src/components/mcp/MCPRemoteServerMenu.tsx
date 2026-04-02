@@ -121,7 +121,7 @@ export function MCPRemoteServerMenu({
       scope: server.scope
     });
     setAppState(prev => {
-      const newClients = prev.mcp.clients.map(c => c.name === server.name ? {
+      const newClients = prev.mcp.clients.map((c: typeof prev.mcp.clients[number]) => c.name === server.name ? {
         ...c,
         type: 'needs-auth' as const
       } : c);
@@ -315,7 +315,7 @@ export function MCPRemoteServerMenu({
 
       // Update app state to remove the disconnected server's tools, commands, and resources
       setAppState(prev_0 => {
-        const newClients_0 = prev_0.mcp.clients.map(c_0 =>
+        const newClients_0 = prev_0.mcp.clients.map((c_0: typeof prev_0.mcp.clients[number]) =>
         // 'failed' is a misnomer here, but we don't really differentiate between "not connected" and "failed" at the moment
         c_0.name === server.name ? {
           ...c_0,

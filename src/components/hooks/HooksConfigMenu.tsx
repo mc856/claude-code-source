@@ -5,7 +5,7 @@ import { c as _c } from "react/compiler-runtime";
  * Users can drill into each hook event, see configured matchers and hooks
  * (of any type: command, prompt, agent, http), and view individual hook
  * details. To add or modify hooks, users should edit settings.json directly
- * or ask Claude â€?the menu directs them there.
+ * or ask Claude â€” the menu directs them there.
  *
  * The menu is read-only because the old editing UI only supported
  * command-type hooks and duplicating the settings.json editing surface
@@ -34,6 +34,10 @@ type Props = {
     display?: CommandResultDisplay;
   }) => void;
 };
+type HooksByEventAndMatcher = Record<
+  HookEvent,
+  Record<string, IndividualHookConfig[]>
+>;
 type ModeState = {
   mode: 'select-event';
 } | {
@@ -68,7 +72,7 @@ export function HooksConfigMenu(t0: Props) {
   const [restrictedByPolicy, setRestrictedByPolicy] = useState(_temp2);
   let t2;
   if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
-    t2 = source => {
+    t2 = (source: string) => {
       if (source === "policySettings") {
         const settings_0 = getSettings_DEPRECATED();
         const hooksDisabled_0 = settings_0?.disableAllHooks === true;
@@ -105,7 +109,7 @@ export function HooksConfigMenu(t0: Props) {
   } else {
     t4 = $[7];
   }
-  const hooksByEventAndMatcher = t4;
+  const hooksByEventAndMatcher: HooksByEventAndMatcher = t4;
   let t5;
   if ($[8] !== hooksByEventAndMatcher || $[9] !== selectedEvent) {
     t5 = getSortedMatchersForEvent(hooksByEventAndMatcher, selectedEvent);
@@ -258,11 +262,13 @@ export function HooksConfigMenu(t0: Props) {
   const hooksDisabled_1 = settings_1?.disableAllHooks === true;
   let t20;
   if ($[33] !== hooksByEventAndMatcher) {
-    const byEvent = {};
+    const byEvent: Partial<Record<HookEvent, number>> = {};
     let total = 0;
-    for (const [event_0, matchers] of Object.entries(hooksByEventAndMatcher)) {
+    for (const [event_0, matchers] of Object.entries(
+      hooksByEventAndMatcher
+    ) as [HookEvent, Record<string, IndividualHookConfig[]>][]) {
       const eventCount = Object.values(matchers).reduce(_temp5, 0);
-      byEvent[event_0 as HookEvent] = eventCount;
+      byEvent[event_0] = eventCount;
       total = total + eventCount;
     }
     t20 = {
@@ -382,7 +388,7 @@ export function HooksConfigMenu(t0: Props) {
       {
         let t21;
         if ($[61] !== combinedToolNames) {
-          t21 = event_2 => {
+          t21 = (event_2: HookEvent) => {
             if (getMatcherMetadata(event_2, combinedToolNames) !== undefined) {
               setModeState({
                 mode: "select-matcher",
@@ -421,7 +427,7 @@ export function HooksConfigMenu(t0: Props) {
         const t21 = hookEventMetadata[modeState.event];
         let t22;
         if ($[70] !== modeState.event) {
-          t22 = matcher => {
+          t22 = (matcher: string) => {
             setModeState({
               mode: "select-hook",
               event: modeState.event,
@@ -463,7 +469,7 @@ export function HooksConfigMenu(t0: Props) {
         const t21 = hookEventMetadata[modeState.event];
         let t22;
         if ($[79] !== modeState.event) {
-          t22 = hook_1 => {
+          t22 = (hook_1: IndividualHookConfig) => {
             setModeState({
               mode: "view-hook",
               event: modeState.event,
@@ -558,13 +564,13 @@ export function HooksConfigMenu(t0: Props) {
 function _temp6() {
   return <Text>Esc to close</Text>;
 }
-function _temp5(sum, hooks) {
+function _temp5(sum: number, hooks: IndividualHookConfig[]) {
   return sum + hooks.length;
 }
-function _temp4(tool) {
+function _temp4(tool: { name: string }) {
   return tool.name;
 }
-function _temp3(s) {
+function _temp3(s: { mcp: { tools: { name: string }[] } }) {
   return s.mcp;
 }
 function _temp2() {

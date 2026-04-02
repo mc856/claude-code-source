@@ -7,6 +7,9 @@ type Props = {
   children: React.ReactNode;
   height?: number;
 };
+type MessageResponseProviderProps = {
+  children: React.ReactNode;
+};
 export function MessageResponse(t0: Props) {
   const $ = _c(8);
   const {
@@ -19,7 +22,7 @@ export function MessageResponse(t0: Props) {
   }
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-    t1 = <NoSelect fromLeftEdge={true} flexShrink={0}><Text dimColor={true}>{"  "}�? </Text></NoSelect>;
+    t1 = <NoSelect fromLeftEdge={true} flexShrink={0}><Text dimColor={true}>{"  "}⎿  </Text></NoSelect>;
     $[0] = t1;
   } else {
     t1 = $[0];
@@ -58,9 +61,9 @@ export function MessageResponse(t0: Props) {
 
 // This is a context that is used to determine if the message response
 // is rendered as a descendant of another MessageResponse. We use it
-// to avoid rendering nested �?characters.
+// to avoid rendering nested ⎿ characters.
 const MessageResponseContext = React.createContext(false);
-function MessageResponseProvider(t0) {
+function MessageResponseProvider(t0: MessageResponseProviderProps) {
   const $ = _c(2);
   const {
     children

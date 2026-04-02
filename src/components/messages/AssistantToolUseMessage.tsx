@@ -32,7 +32,7 @@ type Props = {
   lookups: ReturnType<typeof buildMessageLookups>;
   isTranscriptMode?: boolean;
 };
-export function AssistantToolUseMessage(t0) {
+export function AssistantToolUseMessage(t0: Props) {
   const $ = _c(81);
   const {
     param,
@@ -292,13 +292,25 @@ export function AssistantToolUseMessage(t0) {
   }
   return t16;
 }
-function _temp3(state_1) {
+function _temp3(state_1: {
+  toolPermissionContext: {
+    strippedDangerousRules?: unknown;
+  };
+}) {
   return !!state_1.toolPermissionContext.strippedDangerousRules;
 }
-function _temp2(state_0) {
+function _temp2(state_0: {
+  toolPermissionContext: {
+    mode?: string;
+  };
+}) {
   return state_0.toolPermissionContext.mode;
 }
-function _temp(state) {
+function _temp(state: {
+  pendingWorkerRequest?: {
+    toolUseId?: string;
+  } | null;
+}) {
   return state.pendingWorkerRequest;
 }
 function renderToolUseMessage(tool: Tool, input: unknown, {
@@ -337,7 +349,7 @@ function renderToolUseProgressMessage(tool: Tool, tools: Tools, lookups: ReturnT
   columns: number;
   rows: number;
 }): React.ReactNode {
-  const toolProgressMessages = progressMessagesForMessage.filter((msg): msg is ProgressMessage<ToolProgressData> => msg.data.type !== 'hook_progress');
+  const toolProgressMessages = progressMessagesForMessage.filter((msg): msg is ProgressMessage => msg.data.type !== 'hook_progress');
   try {
     const toolMessages = tool.renderToolUseProgressMessage?.(toolProgressMessages, {
       tools,

@@ -75,7 +75,7 @@ function cachedLexer(content: string): Token[] {
  * - Tables are rendered as React components with proper flexbox layout
  * - Other content is rendered as ANSI strings via formatToken
  */
-export function Markdown(props) {
+export function Markdown(props: Props) {
   const $ = _c(4);
   const settings = useSettings();
   if (settings.syntaxHighlightingDisabled) {
@@ -99,7 +99,7 @@ export function Markdown(props) {
   }
   return t0;
 }
-function MarkdownWithHighlight(props) {
+function MarkdownWithHighlight(props: Props) {
   const $ = _c(4);
   let t0;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
@@ -108,7 +108,7 @@ function MarkdownWithHighlight(props) {
   } else {
     t0 = $[0];
   }
-  const highlight = use(t0);
+  const highlight = use(t0) as CliHighlight | null;
   let t1;
   if ($[1] !== highlight || $[2] !== props) {
     t1 = <MarkdownBody {...props} highlight={highlight} />;
@@ -120,7 +120,9 @@ function MarkdownWithHighlight(props) {
   }
   return t1;
 }
-function MarkdownBody(t0) {
+function MarkdownBody(t0: Props & {
+  highlight: CliHighlight | null;
+}) {
   const $ = _c(7);
   const {
     children,
@@ -129,6 +131,10 @@ function MarkdownBody(t0) {
   } = t0;
   const [theme] = useTheme();
   configureMarked();
+  const AnsiComponent = Ansi as React.ComponentType<{
+    children: string;
+    dimColor?: boolean;
+  }>;
   let elements;
   if ($[0] !== children || $[1] !== dimColor || $[2] !== highlight || $[3] !== theme) {
     const tokens = cachedLexer(stripPromptXMLTags(children));
@@ -136,7 +142,7 @@ function MarkdownBody(t0) {
     let nonTableContent = "";
     const flushNonTableContent = function flushNonTableContent() {
       if (nonTableContent) {
-        elements.push(<Ansi key={elements.length} dimColor={dimColor}>{nonTableContent.trim()}</Ansi>);
+        elements.push(<AnsiComponent key={elements.length} dimColor={dimColor}>{nonTableContent.trim()}</AnsiComponent>);
         nonTableContent = "";
       }
     };

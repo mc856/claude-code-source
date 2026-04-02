@@ -22,7 +22,7 @@ export function MCPReconnect(t0: Props) {
   const store = useAppStateStore();
   const reconnectMcpServer = useMcpReconnect();
   const [isReconnecting, setIsReconnecting] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   let t1;
   let t2;
   if ($[0] !== onComplete || $[1] !== reconnectMcpServer || $[2] !== serverName || $[3] !== store) {
@@ -30,7 +30,9 @@ export function MCPReconnect(t0: Props) {
       const attemptReconnect = async function attemptReconnect() {
         ;
         try {
-          const server = store.getState().mcp.clients.find(c => c.name === serverName);
+          const server = store.getState().mcp.clients.find((c: {
+            name: string;
+          }) => c.name === serverName);
           if (!server) {
             setError(`MCP server "${serverName}" not found`);
             setIsReconnecting(false);
@@ -62,7 +64,7 @@ export function MCPReconnect(t0: Props) {
               }
           }
         } catch (t3) {
-          const err = t3;
+          const err = t3 as unknown;
           const errorMessage = err instanceof Error ? err.message : String(err);
           setError(errorMessage);
           setIsReconnecting(false);

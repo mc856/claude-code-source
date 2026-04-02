@@ -46,12 +46,13 @@ const NULL_RENDERING_TYPES = [
   'current_session_memory',
   'compaction_reminder',
   'date_change',
-] as const satisfies readonly Attachment['type'][]
+] as const
 
 export type NullRenderingAttachmentType = (typeof NULL_RENDERING_TYPES)[number]
 
-const NULL_RENDERING_ATTACHMENT_TYPES: ReadonlySet<Attachment['type']> =
-  new Set(NULL_RENDERING_TYPES)
+const NULL_RENDERING_ATTACHMENT_TYPES: ReadonlySet<string> = new Set(
+  NULL_RENDERING_TYPES as readonly string[],
+)
 
 /**
  * True when this message is an attachment that AttachmentMessage renders as

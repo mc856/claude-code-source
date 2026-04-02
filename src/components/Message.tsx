@@ -55,7 +55,39 @@ export type Props = {
   /** UUID of the latest user bash output message (for auto-expanding) */
   latestBashOutputUUID?: string | null;
 };
-function MessageImpl(t0) {
+type UserMessageProps = {
+  message: NormalizedUserMessage;
+  addMargin: boolean;
+  tools: Tools;
+  progressMessagesForMessage: ProgressMessage[];
+  param: NormalizedUserMessage['message']['content'][number];
+  style?: 'condensed';
+  verbose: boolean;
+  imageIndex: number;
+  isUserContinuation: boolean;
+  lookups: ReturnType<typeof buildMessageLookups>;
+  isTranscriptMode: boolean;
+};
+type AssistantMessageBlockProps = {
+  param: AssistantMessage['message']['content'][number] | ConnectorTextBlock | AdvisorBlock | BetaContentBlock;
+  addMargin: boolean;
+  tools: Tools;
+  commands: Command[];
+  verbose: boolean;
+  inProgressToolUseIDs: Set<string>;
+  progressMessagesForMessage: ProgressMessage[];
+  shouldAnimate: boolean;
+  shouldShowDot: boolean;
+  width?: number | string;
+  inProgressToolCallCount: number;
+  isTranscriptMode: boolean;
+  lookups: ReturnType<typeof buildMessageLookups>;
+  onOpenRateLimitOptions?: () => void;
+  thinkingBlockId: string;
+  lastThinkingBlockId?: string | null;
+  advisorModel?: string | null;
+};
+function MessageImpl(t0: Props) {
   const $ = _c(94);
   const {
     message,
@@ -102,7 +134,7 @@ function MessageImpl(t0) {
         if ($[5] !== addMargin || $[6] !== commands || $[7] !== inProgressToolUseIDs || $[8] !== isTranscriptMode || $[9] !== lastThinkingBlockId || $[10] !== lookups || $[11] !== message.advisorModel || $[12] !== message.message.content || $[13] !== message.uuid || $[14] !== onOpenRateLimitOptions || $[15] !== progressMessagesForMessage || $[16] !== shouldAnimate || $[17] !== shouldShowDot || $[18] !== tools || $[19] !== verbose || $[20] !== width) {
           let t4;
           if ($[22] !== addMargin || $[23] !== commands || $[24] !== inProgressToolUseIDs || $[25] !== isTranscriptMode || $[26] !== lastThinkingBlockId || $[27] !== lookups || $[28] !== message.advisorModel || $[29] !== message.uuid || $[30] !== onOpenRateLimitOptions || $[31] !== progressMessagesForMessage || $[32] !== shouldAnimate || $[33] !== shouldShowDot || $[34] !== tools || $[35] !== verbose || $[36] !== width) {
-            t4 = (_, index_0) => <AssistantMessageBlock key={index_0} param={_} addMargin={addMargin} tools={tools} commands={commands} verbose={verbose} inProgressToolUseIDs={inProgressToolUseIDs} progressMessagesForMessage={progressMessagesForMessage} shouldAnimate={shouldAnimate} shouldShowDot={shouldShowDot} width={width} inProgressToolCallCount={inProgressToolUseIDs.size} isTranscriptMode={isTranscriptMode} lookups={lookups} onOpenRateLimitOptions={onOpenRateLimitOptions} thinkingBlockId={`${message.uuid}:${index_0}`} lastThinkingBlockId={lastThinkingBlockId} advisorModel={message.advisorModel} />;
+            t4 = (param: AssistantMessage['message']['content'][number], index_0: number) => <AssistantMessageBlock key={index_0} param={param} addMargin={addMargin} tools={tools} commands={commands} verbose={verbose} inProgressToolUseIDs={inProgressToolUseIDs} progressMessagesForMessage={progressMessagesForMessage} shouldAnimate={shouldAnimate} shouldShowDot={shouldShowDot} width={width} inProgressToolCallCount={inProgressToolUseIDs.size} isTranscriptMode={isTranscriptMode} lookups={lookups} onOpenRateLimitOptions={onOpenRateLimitOptions} thinkingBlockId={`${message.uuid}:${index_0}`} lastThinkingBlockId={lastThinkingBlockId} advisorModel={message.advisorModel} />;
             $[22] = addMargin;
             $[23] = commands;
             $[24] = inProgressToolUseIDs;
@@ -192,7 +224,7 @@ function MessageImpl(t0) {
         const t2 = containerWidth ?? "100%";
         let t3;
         if ($[47] !== addMargin || $[48] !== imageIndices || $[49] !== isTranscriptMode || $[50] !== isUserContinuation || $[51] !== lookups || $[52] !== message || $[53] !== progressMessagesForMessage || $[54] !== style || $[55] !== tools || $[56] !== verbose) {
-          t3 = message.message.content.map((param_0, index) => <UserMessage key={index} message={message} addMargin={addMargin} tools={tools} progressMessagesForMessage={progressMessagesForMessage} param={param_0} style={style} verbose={verbose} imageIndex={imageIndices[index]} isUserContinuation={isUserContinuation} lookups={lookups} isTranscriptMode={isTranscriptMode} />);
+          t3 = message.message.content.map((param_0: NormalizedUserMessage['message']['content'][number], index: number) => <UserMessage key={index} message={message} addMargin={addMargin} tools={tools} progressMessagesForMessage={progressMessagesForMessage} param={param_0} style={style} verbose={verbose} imageIndex={imageIndices[index]} isUserContinuation={isUserContinuation} lookups={lookups} isTranscriptMode={isTranscriptMode} />);
           $[47] = addMargin;
           $[48] = imageIndices;
           $[49] = isTranscriptMode;
@@ -353,7 +385,7 @@ function MessageImpl(t0) {
       }
   }
 }
-function UserMessage(t0) {
+function UserMessage(t0: UserMessageProps) {
   const $ = _c(20);
   const {
     message,
@@ -430,7 +462,7 @@ function UserMessage(t0) {
       }
   }
 }
-function AssistantMessageBlock(t0) {
+function AssistantMessageBlock(t0: AssistantMessageBlockProps) {
   const $ = _c(45);
   const {
     param,
@@ -564,7 +596,7 @@ function AssistantMessageBlock(t0) {
           const t1 = verbose || isTranscriptMode;
           let t2;
           if ($[37] !== addMargin || $[38] !== advisorModel || $[39] !== lookups.erroredToolUseIDs || $[40] !== lookups.resolvedToolUseIDs || $[41] !== param || $[42] !== shouldAnimate || $[43] !== t1) {
-            t2 = <AdvisorMessage block={param} addMargin={addMargin} resolvedToolUseIDs={lookups.resolvedToolUseIDs} erroredToolUseIDs={lookups.erroredToolUseIDs} shouldAnimate={shouldAnimate} verbose={t1} advisorModel={advisorModel} />;
+            t2 = <AdvisorMessage block={param} addMargin={addMargin} resolvedToolUseIDs={lookups.resolvedToolUseIDs} erroredToolUseIDs={lookups.erroredToolUseIDs} shouldAnimate={shouldAnimate} verbose={t1} advisorModel={advisorModel ?? undefined} />;
             $[37] = addMargin;
             $[38] = advisorModel;
             $[39] = lookups.erroredToolUseIDs;

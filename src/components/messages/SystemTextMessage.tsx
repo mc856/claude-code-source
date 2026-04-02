@@ -27,6 +27,7 @@ import { useAppStateStore } from '../../state/AppState.js';
 import { isBackgroundTask, type TaskState } from '../../tasks/types.js';
 import { getPillLabel } from '../../tasks/pillLabel.js';
 import { useSelectedMessageBg } from '../messageActions.js';
+const HOOK_TIMING_DISPLAY_THRESHOLD_MS = 0;
 type Props = {
   message: SystemMessage;
   addMargin: boolean;
@@ -248,7 +249,12 @@ export function SystemTextMessage(t0: Props) {
   }
   return t4;
 }
-function StopHookSummaryMessage(t0) {
+function StopHookSummaryMessage(t0: {
+  message: SystemStopHookSummaryMessage;
+  addMargin: boolean;
+  verbose: boolean;
+  isTranscriptMode?: boolean;
+}) {
   const $ = _c(47);
   const {
     message,
@@ -375,7 +381,7 @@ function StopHookSummaryMessage(t0) {
   }
   let t12;
   if ($[31] !== preventedContinuation || $[32] !== stopReason) {
-    t12 = preventedContinuation && stopReason && <Text><Text dimColor={true}>�? </Text>{stopReason}</Text>;
+    t12 = preventedContinuation && stopReason && <Text><Text dimColor={true}>⎿  </Text>{stopReason}</Text>;
     $[31] = preventedContinuation;
     $[32] = stopReason;
     $[33] = t12;
@@ -384,7 +390,7 @@ function StopHookSummaryMessage(t0) {
   }
   let t13;
   if ($[34] !== hookErrors || $[35] !== message.hookLabel) {
-    t13 = hookErrors.length > 0 && hookErrors.map((err, idx_1) => <Text key={idx_1}><Text dimColor={true}>�? </Text>{message.hookLabel ?? "Stop"} hook error: {err}</Text>);
+      t13 = hookErrors.length > 0 && hookErrors.map((err: string, idx_1: number) => <Text key={idx_1}><Text dimColor={true}>⎿  </Text>{message.hookLabel ?? "Stop"} hook error: {err}</Text>);
     $[34] = hookErrors;
     $[35] = message.hookLabel;
     $[36] = t13;
@@ -415,18 +421,34 @@ function StopHookSummaryMessage(t0) {
   }
   return t15;
 }
-function _temp3(info_0, idx_0) {
-  const durationStr_0 = false && info_0.durationMs !== undefined ? ` (${formatSecondsShort(info_0.durationMs)})` : "";
-  return <Text key={`cmd-${idx_0}`} dimColor={true}>�? {info_0.command === "prompt" ? `prompt: ${info_0.promptText || ""}` : info_0.command}{durationStr_0}</Text>;
+function _temp3(info_0: {
+  command: string;
+  promptText?: string;
+  durationMs?: number;
+}, idx_0: number) {
+  const durationStr_0 = false && info_0.durationMs !== undefined ? ` (${formatSecondsShort(info_0.durationMs ?? 0)})` : "";
+  return <Text key={`cmd-${idx_0}`} dimColor={true}>⎿  {info_0.command === "prompt" ? `prompt: ${info_0.promptText || ""}` : info_0.command}{durationStr_0}</Text>;
 }
-function _temp2(info, idx) {
-  const durationStr = false && info.durationMs !== undefined ? ` (${formatSecondsShort(info.durationMs)})` : "";
+function _temp2(info: {
+  command: string;
+  promptText?: string;
+  durationMs?: number;
+}, idx: number) {
+  const durationStr = false && info.durationMs !== undefined ? ` (${formatSecondsShort(info.durationMs ?? 0)})` : "";
   return <Text key={`cmd-${idx}`} dimColor={true}>{"     \u23BF "}{info.command === "prompt" ? `prompt: ${info.promptText || ""}` : info.command}{durationStr}</Text>;
 }
-function _temp(sum, h) {
+function _temp(sum: number, h: {
+  durationMs?: number;
+}) {
   return sum + (h.durationMs ?? 0);
 }
-function SystemTextMessageInner(t0) {
+function SystemTextMessageInner(t0: {
+  content: string;
+  addMargin: boolean;
+  dot?: React.ReactNode;
+  color?: TextProps['color'];
+  dimColor?: boolean;
+}) {
   const $ = _c(18);
   const {
     content,
@@ -491,7 +513,10 @@ function SystemTextMessageInner(t0) {
   }
   return t7;
 }
-function TurnDurationMessage(t0) {
+function TurnDurationMessage(t0: {
+  message: SystemTurnDurationMessage;
+  addMargin: boolean;
+}) {
   const $ = _c(17);
   const {
     message,
@@ -591,7 +616,10 @@ function TurnDurationMessage(t0) {
 function _temp4() {
   return sample(TURN_COMPLETION_VERBS) ?? "Worked";
 }
-function MemorySavedMessage(t0) {
+function MemorySavedMessage(t0: {
+  message: SystemMemorySavedMessage;
+  addMargin: boolean;
+}) {
   const $ = _c(16);
   const {
     message,
@@ -603,7 +631,7 @@ function MemorySavedMessage(t0) {
   } = message;
   let t1;
   if ($[0] !== message) {
-    t1 = feature("TEAMMEM") ? teamMemSaved.teamMemSavedPart(message) : null;
+    t1 = feature("TEAMMEM") ? teamMemSaved?.teamMemSavedPart(message) ?? null : null;
     $[0] = message;
     $[1] = t1;
   } else {
@@ -663,10 +691,12 @@ function MemorySavedMessage(t0) {
   }
   return t11;
 }
-function _temp5(p) {
+function _temp5(p: string) {
   return <MemoryFileRow key={p} path={p} />;
 }
-function MemoryFileRow(t0) {
+function MemoryFileRow(t0: {
+  path: string;
+}) {
   const $ = _c(16);
   const {
     path
@@ -730,7 +760,10 @@ function MemoryFileRow(t0) {
   }
   return t8;
 }
-function ThinkingMessage(t0) {
+function ThinkingMessage(t0: {
+  message: SystemThinkingMessage;
+  addMargin: boolean;
+}) {
   const $ = _c(7);
   const {
     message,
@@ -765,7 +798,10 @@ function ThinkingMessage(t0) {
   }
   return t4;
 }
-function BridgeStatusMessage(t0) {
+function BridgeStatusMessage(t0: {
+  message: SystemBridgeStatusMessage;
+  addMargin: boolean;
+}) {
   const $ = _c(13);
   const {
     message,
@@ -797,7 +833,7 @@ function BridgeStatusMessage(t0) {
   }
   let t5;
   if ($[4] !== message.upgradeNudge) {
-    t5 = message.upgradeNudge && <Text dimColor={true}>�?{message.upgradeNudge}</Text>;
+    t5 = message.upgradeNudge && <Text dimColor={true}>⎿ {message.upgradeNudge}</Text>;
     $[4] = message.upgradeNudge;
     $[5] = t5;
   } else {
