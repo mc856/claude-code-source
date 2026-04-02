@@ -110,13 +110,18 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
 
     case 'azure-openai': {
       endpoint =
-        `Azure OpenAI (endpoint: ${config.endpoint}, api-version: ${config.apiVersion})`
+        `Azure OpenAI (endpoint: ${config.endpoint}, deployment: ${config.deployment}, api-version: ${config.apiVersion})`
       resolvedModel = config.deployment
         ? `${config.deployment} (deployment)`
         : '<deployment not set>'
       credentialSource = config.apiKey
         ? 'AZURE_OPENAI_API_KEY (set)'
         : 'DefaultAzureCredential (Entra ID)'
+      limitations.push(
+        config.apiKey
+          ? 'API key authentication is enabled for this Azure OpenAI runtime.'
+          : 'Authentication uses DefaultAzureCredential (Entra ID) when no Azure OpenAI API key is configured.',
+      )
       if (!capabilities.toolCalls) {
         limitations.push(
           'Tool calling is disabled for this Azure OpenAI deployment/runtime; requests will run without tools.',

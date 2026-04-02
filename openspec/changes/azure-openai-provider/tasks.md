@@ -20,6 +20,6 @@ Dependency note: this change builds on provider-layer code introduced under `pro
 
 ## 4. Validation
 
-- [ ] 4.1 Validate successful Azure OpenAI text generation and streaming flows.
+- [x] 4.1 Validate successful Azure OpenAI text generation and streaming flows.
 - [x] 4.2 Validate Azure misconfiguration and authentication failure flows.
-- [ ] 4.3 Validate capability reporting for unsupported or limited Azure OpenAI features.
+- [x] 4.3 Validate capability reporting for unsupported or limited Azure OpenAI features.

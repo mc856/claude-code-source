@@ -881,7 +881,7 @@ export class OpenAIAdapter implements ProviderAdapter {
               }
               if (tc.id && !acc.id) acc.id = tc.id
               if (tc.function?.name) {
-                acc.name += tc.function.name
+                acc.name = tc.function.name
               }
               if (tc.function?.arguments) {
                 acc.arguments += tc.function.arguments
@@ -1010,11 +1010,12 @@ export class OpenAIAdapter implements ProviderAdapter {
         message: `OpenAI network error: ${providerError.message}`,
       })
     } else {
+      const headers = new Headers()
       wrapped = APIError.generate(
         status,
         { error: { message: providerError.message } },
         `OpenAI ${providerError.category} error`,
-        {} as Headers,
+        headers,
       )
     }
     const { createSystemAPIErrorMessage } = await import('../../utils/messages.js')

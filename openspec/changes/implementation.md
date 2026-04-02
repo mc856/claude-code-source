@@ -705,3 +705,202 @@ Repository-level verification confirmed:
 - ignored Claude-specific/shared options are now surfaced explicitly in the OpenAI-compatible adapter path
 - Azure OpenAI inherits the same ignore/gate behavior with provider-specific labeling
 - the supported translated options remain mapped in the request body rather than being downgraded by this change
+
+## 2026-04-01 Debug Record: Task-State Verification Rollback
+
+### Symptom
+
+During a follow-up verification pass focused on task accuracy rather than code-path review, several validation tasks still appeared overstated:
+- `provider-abstraction/tasks.md` marked validation items `2.3` and `4.3` complete without tooling-backed execution evidence in the current repository state
+- `azure-openai-provider/tasks.md` marked `4.2` complete even though the current environment still could not execute the Bun-based test file
+- the existing Azure diagnostics tests did not fully match the current diagnostics implementation, which means at least part of the capability-validation surface is still unresolved
+
+### Root Cause
+
+Two issues were present:
+- task bookkeeping had drifted ahead of executable validation evidence
+- Azure validation expectations in `src/services/providers/azure.test.ts` had diverged from the current diagnostics contract in `src/services/providers/diagnostics.ts`
+
+### Decision
+
+Keep implementation tasks complete where code is present, but roll validation tasks back to incomplete until they are supported by executed automation and reconciled test expectations.
+
+### Fix
+
+The OpenSpec task state was corrected as follows:
+- `provider-abstraction 2.3` -> incomplete
+- `provider-abstraction 4.3` -> incomplete
+- `azure-openai-provider 4.2` -> incomplete
+
+### Verification
+
+Repository review confirmed:
+- no Anthropic-compatible provider validation suite was identified alongside the adapter changes
+- the only focused provider test file currently present is `src/services/providers/azure.test.ts`
+- local execution tooling remains unavailable in this environment:
+  - `bun` not installed
+  - `tsc` not installed
+- current Azure diagnostics tests expect fields that do not match the current implementation contract exactly, so validation cannot be treated as cleanly closed yet
+
+## 2026-04-01 Debug Record: Mirror Recovery and Dependency Backfill
+
+### Symptom
+
+`bun test src/services/providers/azure.test.ts` could not reach the provider assertions because the mirrored repository was missing a mix of source files and package metadata.
+
+### Fix
+
+Recovered the minimum source/runtime surface needed to continue validation:
+- added `src/types/connectorText.ts`
+- added `src/tools/TungstenTool/TungstenTool.ts`
+- added `src/entrypoints/sdk/runtimeTypes.ts`
+- added `src/entrypoints/sdk/coreTypes.generated.ts`
+- added `src/entrypoints/sdk/settingsTypes.generated.ts`
+- added `src/entrypoints/sdk/toolTypes.ts`
+- added `src/entrypoints/sdk/sdkUtilityTypes.ts`
+
+Backfilled package installs needed to keep the test chain moving:
+- `lru-cache`
+- `@growthbook/growthbook`
+- `react`
+- `lodash-es`
+- `chalk`
+- `diff`
+- `@opentelemetry/api`
+- `@opentelemetry/resources`
+- `@opentelemetry/sdk-logs`
+- `@opentelemetry/semantic-conventions`
+- `@modelcontextprotocol/sdk`
+- `@anthropic-ai/sandbox-runtime`
+- `https-proxy-agent`
+- `@opentelemetry/core`
+
+### Verification
+
+The test runner progressed through several distinct blockers after each recovery step:
+- missing `connectorText` source
+- missing package metadata for `lru-cache`
+- missing `lodash-es/memoize.js`
+- missing `chalk`
+- missing `diff`
+- missing OpenTelemetry packages
+- missing `TungstenTool`
+- missing SDK runtime-generated types
+- missing `https-proxy-agent`
+
+The current state is improved, but `azure.test.ts` is still not at the provider assertion stage.
+
+## 2026-04-01 Debug Record: Dependency Backfill and Local Redirect
+
+### Fix
+
+Additional packages were backfilled to keep source-level validation moving:
+- `get-stream`
+- `which`
+- `@anthropic-ai/sdk`
+- `zod`
+- `human-signals`
+- `ajv-formats`
+- `cssfilter`
+- `debug`
+- `agent-base`
+- `eventsource`
+- `eventsource-parser`
+- `pkce-challenge`
+- `@alcalzone/ansi-tokenize`
+- `chokidar`
+- `signal-exit`
+- `usehooks-ts`
+- `color-diff-napi` was not usable as published, so the structured diff path was redirected to the local TypeScript port in `src/native-ts/color-diff/index.ts`
+- `readdirp`
+- `react-reconciler`
+- `zod-to-json-schema`
+- `@pondwader/socks5-server`
+- `@sec-ant/readable-stream`
+- `form-data`
+- `combined-stream`
+- `delayed-stream`
+- `code-excerpt`
+- `bidi-js`
+- `convert-to-spaces`
+- `cli-boxes`
+- `scheduler`
+
+Additional source recovery was also added:
+- `src/ink/global.d.ts`
+
+### Verification
+
+`bun test src/services/providers/azure.test.ts` now passes end-to-end:
+- 31 passing tests
+- 0 failures
+- provider stream translation, auth/error normalization, and Azure diagnostics all match the expected contract
+
+## 2026-04-01 Dependency Recovery Ledger
+
+This mirrors the current recovery work only. It is not a formal dependency manifest yet.
+
+### Runtime packages backfilled
+
+- `get-stream`
+- `which`
+- `@anthropic-ai/sdk`
+- `zod`
+- `human-signals`
+- `ajv-formats`
+- `cssfilter`
+- `debug`
+- `agent-base`
+- `eventsource`
+- `eventsource-parser`
+- `pkce-challenge`
+- `@alcalzone/ansi-tokenize`
+- `chokidar`
+- `signal-exit`
+- `usehooks-ts`
+- `readdirp`
+- `react-reconciler`
+- `zod-to-json-schema`
+- `@pondwader/socks5-server`
+- `@sec-ant/readable-stream`
+- `form-data`
+- `combined-stream`
+- `delayed-stream`
+- `code-excerpt`
+- `bidi-js`
+- `convert-to-spaces`
+- `cli-boxes`
+- `scheduler`
+- `lru-cache`
+- `@growthbook/growthbook`
+- `react`
+- `lodash-es`
+- `chalk`
+- `diff`
+- `@opentelemetry/api`
+- `@opentelemetry/resources`
+- `@opentelemetry/sdk-logs`
+- `@opentelemetry/semantic-conventions`
+- `@opentelemetry/api-logs`
+- `@opentelemetry/core`
+- `@modelcontextprotocol/sdk`
+- `@anthropic-ai/sandbox-runtime`
+- `https-proxy-agent`
+- `eventsource`
+- `eventsource-parser`
+- `ajv`
+- `dom-mutator`
+- `xss`
+
+### Source recovery / local redirects
+
+- `src/types/connectorText.ts`
+- `src/tools/TungstenTool/TungstenTool.ts`
+- `src/entrypoints/sdk/runtimeTypes.ts`
+- `src/entrypoints/sdk/coreTypes.generated.ts`
+- `src/entrypoints/sdk/settingsTypes.generated.ts`
+- `src/entrypoints/sdk/toolTypes.ts`
+- `src/entrypoints/sdk/sdkUtilityTypes.ts`
+- `src/ink/global.d.ts`
+- `src/tools/WorkflowTool/constants.ts`
+- `src/components/StructuredDiff/colorDiff.ts` now redirects to the local TypeScript color-diff port in `src/native-ts/color-diff/index.ts`
