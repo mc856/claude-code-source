@@ -2024,15 +2024,6 @@ async function run(): Promise<CommanderCommand> {
     const userSpecifiedModel = options.model === 'default' ? getDefaultMainLoopModel() : options.model;
     const userSpecifiedFallbackModel = fallbackModel === 'default' ? getDefaultMainLoopModel() : fallbackModel;
 
-    try {
-      // Pass the resolved model so provider-model incompatibilities are caught
-      // before the first inference request (e.g. Claude alias with OpenAI provider).
-      assertProviderConfigValid(undefined, userSpecifiedModel ?? undefined);
-    } catch (error) {
-      process.stderr.write(chalk.red(`${errorMessage(error)}\n`));
-      process.exit(1);
-    }
-
     // Reuse preSetupCwd unless setup() chdir'd (worktreeEnabled). Saves a
     // getCwd() syscall in the common path.
     const currentCwd = worktreeEnabled ? getCwd() : preSetupCwd;
@@ -2126,6 +2117,14 @@ async function run(): Promise<CommanderCommand> {
 
     // Compute resolved model for hooks (use user-specified model at launch)
     setInitialMainLoopModel(getUserSpecifiedModelSetting() || null);
+    try {
+      // Validate the model that will actually be used at runtime, after any
+      // agent/model overrides have been folded into effectiveModel.
+      assertProviderConfigValid(undefined, effectiveModel ?? userSpecifiedModel ?? getDefaultMainLoopModel());
+    } catch (error) {
+      process.stderr.write(chalk.red(`${errorMessage(error)}\n`));
+      process.exit(1);
+    }
     const initialMainLoopModel = getInitialMainLoopModel();
     const resolvedInitialModel = parseUserSpecifiedModel(initialMainLoopModel ?? getDefaultMainLoopModel());
     let advisorModel: string | undefined;

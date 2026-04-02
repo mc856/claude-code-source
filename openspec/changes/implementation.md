@@ -904,3 +904,84 @@ This mirrors the current recovery work only. It is not a formal dependency manif
 - `src/ink/global.d.ts`
 - `src/tools/WorkflowTool/constants.ts`
 - `src/components/StructuredDiff/colorDiff.ts` now redirects to the local TypeScript color-diff port in `src/native-ts/color-diff/index.ts`
+
+## 2026-04-02 Review Summary: provider-selection-ux Implementation
+
+All 12 tasks in `provider-selection-ux/tasks.md` were implemented in this session.
+
+### Changes Implemented
+
+**1. Provider Selection Precedence (`src/services/providers/config.ts`)**
+
+Replaced the previous env-only provider resolution with a full multi-source precedence chain:
+- `--provider` CLI flag (parsed from `process.argv` via `eagerParseCliFlag`)
+- `settings.provider` (read via `getSettings_DEPRECATED()`)
+- `CLAUDE_CODE_PROVIDER` env var
+- Legacy Anthropic-compatible env vars (`CLAUDE_CODE_USE_BEDROCK/VERTEX/FOUNDRY`) — still map to `claude`
+- Default: `claude`
+
+Added `warnProviderConflict()` to emit a stderr diagnostic when two explicit sources disagree. Conflict detection covers all three pairs: CLI vs env, CLI vs settings, env vs settings.
+
+The `resolveActiveProvider()` function now guarantees exactly one provider is selected before any model resolution runs.
+
+**2. Provider-Model Compatibility Validation (`src/services/providers/validate.ts`)**
+
+Added `validateProviderModelCombination(config, model)` which rejects Claude-specific model strings and aliases when the active provider is `openai` or `azure-openai`. Detection covers:
+- Claude family aliases: `sonnet`, `opus`, `haiku`, `best`, `opusplan`, `sonnet[1m]`, `opus[1m]`
+- Full Anthropic model IDs: strings starting with `claude-`
+- Cross-region Bedrock/Vertex prefixes: `us.anthropic.*`, `eu.anthropic.*`, `ap.anthropic.*`
+
+`assertProviderConfigValid()` updated to accept an optional `model` parameter so provider-model validation runs in the same startup throw path as credential validation.
+
+`validateProviderModelCombination` exported from `src/services/providers/index.ts` for external use.
+
+**3. Startup Model Validation (`src/main.tsx`)**
+
+Updated the `assertProviderConfigValid()` call at startup to pass `userSpecifiedModel` so a Claude alias like `sonnet` combined with `CLAUDE_CODE_PROVIDER=openai` is caught and reported before the first request, not inside the inference path.
+
+**4. Diagnostics Fields (`src/services/providers/types.ts`, `diagnostics.ts`)**
+
+Added two new fields to `ProviderDiagnostics`:
+- `resolvedModel`: human-readable model or deployment target per provider; reflects the configured env var or indicates runtime alias resolution for Claude
+- `credentialSource`: describes auth method without exposing secrets (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY (missing)`, `DefaultAzureCredential (Entra ID)`)
+
+`formatProviderDiagnostics()` updated to include both new fields in its formatted output.
+
+**5. Status Display (`src/utils/status.tsx`)**
+
+`buildAPIProviderProperties()` updated to include:
+- `Model / Deployment` row from `diagnostics.resolvedModel`
+- `Credentials` row from `diagnostics.credentialSource`
+
+These appear in the `/status` Settings → Provider tab.
+
+**6. Improved Error Messages (`src/services/providers/config.ts`)**
+
+Validation errors for OpenAI and Azure OpenAI rewritten to be provider-generic (not assuming the env var as the only source):
+- OpenAI: "OpenAI provider requires an API key. Set OPENAI_API_KEY..."
+- Azure: "Azure OpenAI provider requires an endpoint URL. Set AZURE_OPENAI_ENDPOINT..."
+
+Error messages now lead with the provider name and what is missing rather than leading with the env var name.
+
+**7. Legacy Path Verification**
+
+Legacy Anthropic-compatible paths (`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, `CLAUDE_CODE_USE_FOUNDRY`) were confirmed unchanged: they fall through `resolveActiveProvider()` to the `'claude'` default and are handled inside the claude adapter sub-path. No migration action needed.
+
+### Validation Notes
+
+Code-path verification confirmed:
+- provider config now reads `--provider` flag, settings, and env in documented precedence order
+- conflict detection logic covers all three source pairs
+- provider-model validation fires at startup with the resolved model target
+- diagnostics now include resolved model and credential source
+- status output now shows model/deployment and credential rows
+
+Automated test execution was not performed in this session (same environment constraints as prior passes — no `bun`, no `tsc`).
+
+### Remaining Follow-up
+
+None for `provider-selection-ux` tasks. All 12 tasks marked complete.
+
+Broader follow-up from earlier changes that remains open:
+- automated validation of provider tests in an environment with `bun` available
+- Anthropic-only feature entry-point audit (beyond the highest-visibility entry points already gated)

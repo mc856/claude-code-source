@@ -6,6 +6,7 @@
  */
 
 import { getAPIProvider } from '../../utils/model/providers.js'
+import { getMainLoopModel } from '../../utils/model/model.js'
 import { getProviderConfig } from './config.js'
 import { getProviderAdapter } from './registry.js'
 import type { ProviderDiagnostics } from './types.js'
@@ -21,8 +22,8 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
   const limitations: string[] = []
 
   let endpoint: string
-  let resolvedModel: string
   let credentialSource: string
+  const resolvedModel = getMainLoopModel()
 
   switch (config.provider) {
     case 'claude': {
@@ -70,17 +71,12 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
         }
       }
 
-      // Resolved model: show configured override or indicate runtime resolution.
-      resolvedModel = process.env.ANTHROPIC_MODEL
-        ? `${process.env.ANTHROPIC_MODEL} (ANTHROPIC_MODEL)`
-        : 'resolved at runtime (alias or default)'
       break
     }
 
     case 'openai': {
       const base = config.baseUrl ?? 'https://api.openai.com'
       endpoint = `OpenAI API (${base})`
-      resolvedModel = config.model
       credentialSource = config.apiKey
         ? 'OPENAI_API_KEY (set)'
         : 'OPENAI_API_KEY (missing)'
@@ -111,9 +107,6 @@ export function getProviderDiagnostics(): ProviderDiagnostics {
     case 'azure-openai': {
       endpoint =
         `Azure OpenAI (endpoint: ${config.endpoint}, deployment: ${config.deployment}, api-version: ${config.apiVersion})`
-      resolvedModel = config.deployment
-        ? `${config.deployment} (deployment)`
-        : '<deployment not set>'
       credentialSource = config.apiKey
         ? 'AZURE_OPENAI_API_KEY (set)'
         : 'DefaultAzureCredential (Entra ID)'

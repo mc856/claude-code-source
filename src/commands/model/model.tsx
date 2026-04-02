@@ -14,6 +14,7 @@ import { MODEL_ALIASES } from '../../utils/model/aliases.js';
 import { checkOpus1mAccess, checkSonnet1mAccess } from '../../utils/model/check1mAccess.js';
 import { getDefaultMainLoopModelSetting, isOpus1mMergeEnabled, renderDefaultModelSetting } from '../../utils/model/model.js';
 import { isModelAllowed } from '../../utils/model/modelAllowlist.js';
+import { getProviderConfig } from '../../services/providers/config.js';
 import { validateModel } from '../../utils/model/validateModel.js';
 function ModelPickerWrapper(t0) {
   const $ = _c(17);
@@ -168,8 +169,9 @@ function SetModelAndClose({
         return;
       }
 
-      // Skip validation for known aliases - they're predefined and should work
-      if (isKnownAlias(model)) {
+      // Skip validation for known aliases only on Claude. Other providers need
+      // compatibility validation so aliases like "sonnet" fail early.
+      if (getProviderConfig().provider === 'claude' && isKnownAlias(model)) {
         setModel(model);
         return;
       }

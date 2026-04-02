@@ -16,12 +16,15 @@ import type { HookCallbackMatcher } from 'src/types/hooks.js'
 // (rule only checks ./ and / prefixes); explicit disable documents intent.
 // eslint-disable-next-line custom-rules/bootstrap-isolation
 import { randomUUID } from 'src/utils/crypto.js'
+import { logForDebugging } from 'src/utils/debug.js'
 import type { ModelSetting } from 'src/utils/model/model.js'
 import type { ModelStrings } from 'src/utils/model/modelStrings.js'
 import type { SettingSource } from 'src/utils/settings/constants.js'
 import { resetSettingsCache } from 'src/utils/settings/settingsCache.js'
 import type { PluginHookMatcher } from 'src/utils/settings/types.js'
 import { createSignal } from 'src/utils/signal.js'
+import { getProviderConfig } from 'src/services/providers/config.js'
+import { validateProviderModelCombination } from 'src/services/providers/validate.js'
 
 // Union type for registered hooks - can be SDK callbacks or native plugin hooks
 type RegisteredHookMatcher = HookCallbackMatcher | PluginHookMatcher
@@ -846,6 +849,16 @@ export function getInitialMainLoopModel(): ModelSetting {
 export function setMainLoopModelOverride(
   model: ModelSetting | undefined,
 ): void {
+  if (model !== undefined && model !== null) {
+    const errors = validateProviderModelCombination(getProviderConfig(), model)
+    if (errors.length > 0) {
+      logForDebugging(
+        `[provider] Ignoring incompatible model override "${model}": ${errors[0]}`,
+        { level: 'warn' },
+      )
+      return
+    }
+  }
   STATE.mainLoopModelOverride = model
 }
 

@@ -3,6 +3,7 @@ import { MODEL_ALIASES } from './aliases.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import { getAPIProvider } from './providers.js'
 import { getProviderConfig, validateProviderConfig } from '../../services/providers/config.js'
+import { validateProviderModelCombination } from '../../services/providers/validate.js'
 import { sideQuery } from '../sideQuery.js'
 import {
   NotFoundError,
@@ -23,6 +24,7 @@ export async function validateModel(
 ): Promise<{ valid: boolean; error?: string }> {
   const normalizedModel = model.trim()
   const providerConfig = getProviderConfig()
+  const cacheKey = `${providerConfig.provider}:${normalizedModel}`
 
   // Empty model is invalid
   if (!normalizedModel) {
@@ -55,23 +57,30 @@ export async function validateModel(
     return { valid: true }
   }
 
-  // Check cache first
-  if (validModelCache.has(normalizedModel)) {
-    return { valid: true }
-  }
-
   if (providerConfig.provider !== 'claude') {
     const configResult = validateProviderConfig(providerConfig)
     if (!configResult.valid) {
       return { valid: false, error: configResult.errors[0] }
     }
 
+    const compatibilityErrors = validateProviderModelCombination(
+      providerConfig,
+      normalizedModel,
+    )
+    if (compatibilityErrors.length > 0) {
+      return { valid: false, error: compatibilityErrors[0] }
+    }
+
     // OpenAI-compatible model identifiers and Azure deployment names are
     // provider-specific; avoid misvalidating them through Anthropic sideQuery.
-    validModelCache.set(normalizedModel, true)
+    validModelCache.set(cacheKey, true)
     return { valid: true }
   }
 
+  // Check cache first for Claude-side validation only.
+  if (validModelCache.has(cacheKey)) {
+    return { valid: true }
+  }
 
   // Try to make an actual API call with minimal parameters
   try {
@@ -95,7 +104,7 @@ export async function validateModel(
     })
 
     // If we got here, the model is valid
-    validModelCache.set(normalizedModel, true)
+    validModelCache.set(cacheKey, true)
     return { valid: true }
   } catch (error) {
     return handleValidationError(error, normalizedModel)

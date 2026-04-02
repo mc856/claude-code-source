@@ -36,7 +36,11 @@ import { isRunningOnHomespace } from '../../utils/envUtils.js'
 import { errorMessage } from '../../utils/errors.js'
 import { logError } from '../../utils/log.js'
 import { getAPIProvider } from '../../utils/model/providers.js'
-import { getProviderConfig } from '../../services/providers/index.js'
+import {
+  getProviderConfig,
+  getProviderDiagnostics,
+  validateProviderConfig,
+} from '../../services/providers/index.js'
 import { getInitialSettings } from '../../utils/settings/settings.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import {
@@ -235,18 +239,39 @@ export async function authStatus(opts: {
   text?: boolean
 }): Promise<void> {
   const { source: authTokenSource, hasToken } = getAuthTokenSource()
-  const { source: apiKeySource } = getAnthropicApiKeyWithSource()
+  const providerConfig = getProviderConfig()
+  const providerDiagnostics = getProviderDiagnostics()
+  const isClaudeProvider = providerConfig.provider === 'claude'
+  let apiKeySource: 'ANTHROPIC_API_KEY' | 'apiKeyHelper' | '/login managed key' | 'none' =
+    'none'
+  if (isClaudeProvider) {
+    try {
+      apiKeySource = getAnthropicApiKeyWithSource().source
+    } catch {
+      apiKeySource = 'none'
+    }
+  }
   const hasApiKeyEnvVar =
-    !!process.env.ANTHROPIC_API_KEY && !isRunningOnHomespace()
-  const oauthAccount = getOauthAccountInfo()
-  const subscriptionType = getSubscriptionType()
+    isClaudeProvider &&
+    !!process.env.ANTHROPIC_API_KEY &&
+    !isRunningOnHomespace()
+  const oauthAccount = isClaudeProvider ? getOauthAccountInfo() : undefined
+  const subscriptionType = isClaudeProvider ? getSubscriptionType() : null
   const using3P = isUsing3PServices()
   const loggedIn =
-    hasToken || apiKeySource !== 'none' || hasApiKeyEnvVar || using3P
+    isClaudeProvider
+      ? hasToken || apiKeySource !== 'none' || hasApiKeyEnvVar || using3P
+      : validateProviderConfig(providerConfig).valid
 
   // Determine auth method
   let authMethod: string = 'none'
-  if (using3P) {
+  if (providerConfig.provider === 'openai') {
+    authMethod = providerConfig.apiKey ? 'api_key' : 'none'
+  } else if (providerConfig.provider === 'azure-openai') {
+    authMethod = providerConfig.apiKey
+      ? 'api_key'
+      : 'default_azure_credential'
+  } else if (using3P) {
     authMethod = 'third_party'
   } else if (authTokenSource === 'claude.ai') {
     authMethod = 'claude.ai'
@@ -261,10 +286,9 @@ export async function authStatus(opts: {
   }
 
   if (opts.text) {
-    const properties = [
-      ...buildAccountProperties(),
-      ...buildAPIProviderProperties(),
-    ]
+    const properties = isClaudeProvider
+      ? [...buildAccountProperties(), ...buildAPIProviderProperties()]
+      : [...buildAPIProviderProperties()]
     let hasAuthProperty = false
     for (const prop of properties) {
       const value =
@@ -292,10 +316,8 @@ export async function authStatus(opts: {
       )
     }
   } else {
-    const apiProvider = getAPIProvider()
-    const provider = getProviderConfig().provider
     const resolvedApiKeySource =
-      apiKeySource !== 'none'
+      isClaudeProvider && apiKeySource !== 'none'
         ? apiKeySource
         : hasApiKeyEnvVar
           ? 'ANTHROPIC_API_KEY'
@@ -303,8 +325,16 @@ export async function authStatus(opts: {
     const output: Record<string, string | boolean | null> = {
       loggedIn,
       authMethod,
-      provider,
-      apiProvider,
+      provider: providerConfig.provider,
+      endpoint: providerDiagnostics.endpoint,
+      resolvedModel: providerDiagnostics.resolvedModel,
+      credentialSource: providerDiagnostics.credentialSource,
+    }
+    if (isClaudeProvider) {
+      output.apiProvider = getAPIProvider()
+    }
+    if (providerDiagnostics.limitations.length > 0) {
+      output.providerLimitations = providerDiagnostics.limitations.join(' | ')
     }
     if (resolvedApiKeySource) {
       output.apiKeySource = resolvedApiKeySource

@@ -8,7 +8,7 @@
 
 - [x] 2.1 Wrap the existing first-party, Bedrock, Vertex, and Foundry paths behind the new provider adapter boundary.
 - [x] 2.2 Move provider-specific streaming and tool-call translation into adapter implementations while preserving current Anthropic-compatible behavior.
-- [ ] 2.3 Add focused validation for success and failure paths across existing Anthropic-compatible providers after the adapter refactor.
+- [x] 2.3 Add focused validation for success and failure paths across existing Anthropic-compatible providers after the adapter refactor.
 
 ## 3. Provider Configuration
 

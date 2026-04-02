@@ -76,6 +76,7 @@ import {
 import { sleep } from './sleep.js'
 import { jsonParse } from './slowOperations.js'
 import { clearToolSchemaCache } from './toolSchemaCache.js'
+import { getProviderConfig } from 'src/services/providers/config.js'
 
 /** Default TTL for API key helper cache in milliseconds (5 minutes) */
 const DEFAULT_API_KEY_HELPER_TTL = 5 * 60 * 1000
@@ -100,6 +101,9 @@ function isManagedOAuthContext(): boolean {
 export function isAnthropicAuthEnabled(): boolean {
   // --bare: API-key-only, never OAuth.
   if (isBareMode()) return false
+
+  // OpenAI/Azure providers do not use Anthropic auth surfaces.
+  if (getProviderConfig().provider !== 'claude') return false
 
   // `claude ssh` remote: ANTHROPIC_UNIX_SOCKET tunnels API calls through a
   // local auth-injecting proxy. The launcher sets CLAUDE_CODE_OAUTH_TOKEN as a
@@ -1861,6 +1865,9 @@ export type UserAccountInfo = {
 }
 
 export function getAccountInformation() {
+  if (getProviderConfig().provider !== 'claude') {
+    return undefined
+  }
   const apiProvider = getAPIProvider()
   // Only provide account info for first-party Anthropic API
   if (apiProvider !== 'firstParty') {
