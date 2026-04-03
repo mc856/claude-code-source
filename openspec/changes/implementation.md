@@ -1523,3 +1523,41 @@ After this pass, the first-screen `tsc` errors moved off the message stack and i
 - `src/components/OutputStylePicker.tsx`
 
 This is another useful phase boundary: the repository is no longer blocked by message rendering or attachment/type-recovery issues, and the remaining first-screen errors are now centered in reusable selection/picker/onboarding components.
+
+### Permissions Flow Type Recovery
+
+I then pushed the TypeScript baseline past the first permissions workflow screens and recorded where local type fixes now intentionally differ from `cli.js.map`.
+
+- confirmed current local-vs-map diffs in the active permissions files are from intentional type recovery, not source restoration damage:
+  - `src/components/permissions/ComputerUseApproval/ComputerUseApproval.tsx`
+  - `src/components/permissions/NotebookEditPermissionRequest/NotebookEditPermissionRequest.tsx`
+  - `src/components/permissions/NotebookEditPermissionRequest/NotebookEditToolDiff.tsx`
+  - `src/components/permissions/FilePermissionDialog/FilePermissionDialog.tsx`
+  - `src/components/permissions/FileWritePermissionRequest/FileWriteToolDiff.tsx`
+- fixed permission request entry components and request-specific helpers:
+  - `src/components/permissions/AskUserQuestionPermissionRequest/AskUserQuestionPermissionRequest.tsx`
+  - `src/components/permissions/AskUserQuestionPermissionRequest/QuestionView.tsx`
+  - `src/components/permissions/BashPermissionRequest/bashToolUseOptions.tsx`
+  - `src/components/permissions/ComputerUseApproval/ComputerUseApproval.tsx`
+  - `src/components/permissions/EnterPlanModePermissionRequest/EnterPlanModePermissionRequest.tsx`
+  - `src/components/permissions/FallbackPermissionRequest.tsx`
+  - `src/components/permissions/FileEditPermissionRequest/FileEditPermissionRequest.tsx`
+  - `src/components/permissions/FilesystemPermissionRequest/FilesystemPermissionRequest.tsx`
+  - `src/components/permissions/FileWritePermissionRequest/FileWritePermissionRequest.tsx`
+  - `src/components/permissions/FilePermissionDialog/FilePermissionDialog.tsx`
+  - `src/components/permissions/FileWritePermissionRequest/FileWriteToolDiff.tsx`
+  - `src/components/permissions/NotebookEditPermissionRequest/NotebookEditPermissionRequest.tsx`
+  - `src/components/permissions/NotebookEditPermissionRequest/NotebookEditToolDiff.tsx`
+- added missing type surface needed by reconstructed notebook permission flows:
+  - `src/types/notebook.ts`
+  - `src/global.d.ts`
+
+After this pass, the leading `tsc --noEmit -p tsconfig.json --pretty false` errors moved off the first request-specific permission dialogs and into the shared permission explanation / decision layer:
+- `src/components/permissions/PermissionDecisionDebugInfo.tsx`
+- `src/components/permissions/PermissionExplanation.tsx`
+- `src/components/permissions/PermissionPrompt.tsx`
+- `src/components/permissions/PermissionRequest.tsx`
+- `src/components/permissions/PermissionRuleExplanation.tsx`
+- `src/components/permissions/rules/*`
+
+This is the next useful boundary: the remaining first-screen errors are now concentrated in the shared permissions framework rather than individual request UIs.

@@ -72,6 +72,56 @@ declare module '@opentelemetry/sdk-trace-base' {
   export class BasicTracerProvider {}
 }
 
+declare module '@ant/computer-use-mcp/sentinelApps' {
+  export type SentinelCategory = 'shell' | 'filesystem' | 'system_settings'
+  export function getSentinelCategory(
+    bundleId: string,
+  ): SentinelCategory | null
+}
+
+declare module '@ant/computer-use-mcp/types' {
+  export const DEFAULT_GRANT_FLAGS: {
+    clipboardRead: boolean
+    clipboardWrite: boolean
+    systemKeyCombos: boolean
+  }
+
+  export interface CuResolvedApp {
+    bundleId: string
+    displayName: string
+  }
+
+  export interface CuRequestedApp {
+    requestedName: string
+    resolved?: CuResolvedApp
+    alreadyGranted?: boolean
+  }
+
+  export interface CuPermissionRequest {
+    tccState?: {
+      accessibility: boolean
+      screenRecording: boolean
+    }
+    apps: CuRequestedApp[]
+    requestedFlags: Record<keyof typeof DEFAULT_GRANT_FLAGS, boolean>
+    reason?: string
+    willHide?: unknown[]
+  }
+
+  export interface CuPermissionResponse {
+    granted: Array<{
+      bundleId: string
+      displayName: string
+      grantedAt: number
+    }>
+    denied: Array<{
+      bundleId: string
+      reason: 'user_denied' | 'not_installed'
+    }>
+    flags: typeof DEFAULT_GRANT_FLAGS
+  }
+}
+
 declare module 'execa' {
   export function execa(
     command: string,
@@ -101,4 +151,20 @@ declare module '@commander-js/extra-typings' {
     addOption(option: Option): Command
     action(handler: (...args: any[]) => any): Command
   }
+}
+
+declare module '../../tools/ReviewArtifactTool/ReviewArtifactTool.js' {
+  export const ReviewArtifactTool: any
+}
+
+declare module './ReviewArtifactPermissionRequest/ReviewArtifactPermissionRequest.js' {
+  export const ReviewArtifactPermissionRequest: any
+}
+
+declare module '../../tools/WorkflowTool/WorkflowTool.js' {
+  export const WorkflowTool: any
+}
+
+declare module '../../tools/WorkflowTool/WorkflowPermissionRequest.js' {
+  export const WorkflowPermissionRequest: any
 }

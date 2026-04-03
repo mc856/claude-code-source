@@ -51,7 +51,7 @@ function ClassifierCheckingSubtitle() {
   }
   let t1;
   if ($[1] !== glimmerIndex) {
-    t1 = <Text>{t0.map((char, i) => <ShimmerChar key={i} char={char} index={i} glimmerIndex={glimmerIndex} messageColor="inactive" shimmerColor="subtle" />)}</Text>;
+    t1 = <Text>{t0.map((char: string, i: number) => <ShimmerChar key={i} char={char} index={i} glimmerIndex={glimmerIndex} messageColor="inactive" shimmerColor="subtle" />)}</Text>;
     $[1] = glimmerIndex;
     $[2] = t1;
   } else {
@@ -68,7 +68,7 @@ function ClassifierCheckingSubtitle() {
   }
   return t2;
 }
-export function BashPermissionRequest(props) {
+export function BashPermissionRequest(props: PermissionRequestProps) {
   const $ = _c(21);
   const {
     toolUseConfirm,

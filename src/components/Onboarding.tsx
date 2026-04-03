@@ -27,6 +27,11 @@ interface OnboardingStep {
 type Props = {
   onDone(): void;
 };
+type SkippableStepProps = {
+  skip: boolean;
+  onSkip: () => void;
+  children: React.ReactNode;
+};
 export function Onboarding({
   onDone
 }: Props): React.ReactNode {
@@ -211,7 +216,7 @@ export function Onboarding({
       </Box>
     </Box>;
 }
-export function SkippableStep(t0: Props) {
+export function SkippableStep(t0: SkippableStepProps) {
   const $ = _c(4);
   const {
     skip,
