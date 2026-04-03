@@ -2,3 +2,5 @@ node_modules/
 .bun/
 bun.lockb
 tsc-errors-*.txt
+.tmp-trace-*.txt
+.tmp-tsc-*.txt

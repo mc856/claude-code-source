@@ -10,6 +10,23 @@ The repository is a source mirror reconstructed from a bundled Claude Code relea
 - Introduce layered validation rules that distinguish source-entry runtime validation from full-repository type validation.
 - Capture the rule that repository-wide `tsc` cleanliness is not the immediate completion gate for restoration work.
 
+## Strategy Summary
+
+This change follows a "runnable restoration" strategy rather than a "full source reconstruction" strategy:
+
+- accept that the mirrored `src/` tree is incomplete because Bun compile-time feature elimination removed 100+ internal or gated modules from the published artifact
+- restore a minimal runnable source baseline first, instead of treating repository-wide `tsc` cleanup as the primary goal
+- classify missing imports before repairing them: real implementation, runtime shim, type-only shim, or explicit guard
+- use donor code selectively as a restoration reference, not as an authoritative merge target
+- treat repository-wide `tsc` as a monitoring signal that helps identify the next repair cluster, not as the near-term completion gate
+
+In practice, this means the team should prefer:
+
+- central compatibility fixes over repeated local workarounds
+- startup-path repairs over broad type-only cleanup
+- explicit degraded behavior over pretending unrecoverable internal features are fully implemented
+- grouped repair passes by blocker class over unbounded file-by-file error chasing
+
 ## Capabilities
 
 ### New Capabilities

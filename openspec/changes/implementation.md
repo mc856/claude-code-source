@@ -11,6 +11,7 @@ It is not the source of truth for final requirements or architecture:
 - Use `specs/model-provider-abstraction/spec.md` for requirements.
 - Use `design.md` for final design decisions.
 - Use `tasks.md` for implementation status.
+- For `runtime-restoration-baseline`, use the runnable-source baseline and restoration-validation specs as the completion contract rather than repository-wide `tsc` cleanliness.
 
 ## Recommended Record Format
 
@@ -24,12 +25,191 @@ Recommended writing rules:
 - keep one dated section per review/remediation pass
 - record observed behavior first, then the code decision
 - separate `code-path verification` from `executed tests`
+- for source-restoration work, separate:
+  - runnable baseline status
+  - active-path blockers
+  - deferred repository-wide type debt
 - when validation is blocked by tooling, record the blocker explicitly
 - keep execution notes in this file only; avoid parallel per-change implementation logs
 
 Current file status:
 - the content is already usable
 - the main change needed is to keep newer entries clearly grouped by review pass so task status, bug findings, and remediation do not blur together
+
+## 2026-04-03 Debug Record: Runtime Restoration Baseline Round 1
+
+### Review Summary
+
+The new `runtime-restoration-baseline` change started by defining a narrow runnable-source baseline instead of treating full-repository `tsc` success as the immediate gate.
+
+Current runnable baseline:
+- `bun src/entrypoints/cli.tsx --version`
+- `bun src/entrypoints/cli.tsx --help`
+- `node cli.js --version`
+
+Current baseline status after this pass:
+- source `--version`: passing
+- source `--help`: passing
+- prebuilt `cli.js --version`: passing
+
+Repository-wide `tsc` remains a monitoring signal rather than the baseline gate.
+
+### Debug Record: Baseline Definition And Blocker Inventory
+
+#### Symptom
+
+The prebuilt artifact already ran successfully, but the reconstructed source entrypoint failed immediately and gave the team no stable definition of what "restored enough to continue" should mean.
+
+#### Root Cause
+
+Restoration work had been measured mainly through repository-wide `tsc`, which mixed:
+- source-entry runtime blockers
+- missing published-artifact modules and assets
+- broad reconstructed-source typing drift
+
+#### Decision
+
+Define the restoration baseline around startup-oriented source flows first:
+- source `--version`
+- source `--help`
+- prebuilt version parity check
+
+Track anything outside those flows as either active-path follow-up or deferred debt.
+
+#### Fix
+
+This pass established the baseline and the first active-path blocker inventory:
+- build-time/global blocker:
+  - `MACRO` unavailable during source execution
+- runtime-safe optional dependency blocker:
+  - `@ant/claude-for-chrome-mcp` was imported as a hard startup dependency
+- runtime-critical static asset blocker:
+  - bundled `verify` markdown assets were absent from the restored tree
+- deferred non-baseline debt:
+  - repository-wide `tsc` still reports large volumes of typing and declaration errors
+
+### Debug Record: Source Runtime Compatibility Layer
+
+#### Symptom
+
+`bun src/entrypoints/cli.tsx --version` failed before any meaningful startup validation because `MACRO` was not defined at source runtime.
+
+#### Root Cause
+
+The published bundle relied on build-time injection, but the reconstructed source tree was being executed directly without restoring those injected globals.
+
+#### Decision
+
+Add a minimal source-runtime compatibility layer instead of patching `MACRO` usage callsite-by-callsite.
+
+#### Fix
+
+This pass added:
+- `src/entrypoints/sourceRuntimeCompat.ts`
+  - initializes a minimal `globalThis.MACRO` from `package.json` metadata when running from source
+- early imports of that compatibility layer in:
+  - `src/entrypoints/cli.tsx`
+  - `src/entrypoints/mcp.ts`
+- expanded `MACRO` declarations in `src/global.d.ts` for restoration-era fields consumed by existing source
+
+#### Verification
+
+Executed:
+- `bun src/entrypoints/cli.tsx --version`
+
+Observed result:
+- returned `2.1.88 (Claude Code)`
+
+### Debug Record: Optional Dependency Guard For Claude In Chrome
+
+#### Symptom
+
+After `MACRO` was restored, source `--help` still failed because startup imported `@ant/claude-for-chrome-mcp`, which is not available in the current restored environment.
+
+#### Root Cause
+
+Claude-in-Chrome files on the startup path treated that external package as a required top-level dependency instead of an optional integration.
+
+#### Decision
+
+Convert the startup-path use of the package into explicit degraded behavior:
+- startup must not crash if the package is absent
+- actual feature use may fail with a clear restoration-phase message
+
+#### Fix
+
+This pass:
+- changed `src/utils/claudeInChrome/setup.ts` to lazily resolve browser tools and throw an explicit feature-level error only when the integration is actually activated
+- changed `src/skills/bundled/claudeInChrome.ts` to lazily resolve browser tool metadata instead of hard-importing the package at module load
+
+#### Verification
+
+Executed:
+- `bun src/entrypoints/cli.tsx --help`
+
+Intermediate observed result:
+- the startup blocker moved off `@ant/claude-for-chrome-mcp` and advanced to missing bundled verify assets, confirming the guard worked
+
+### Debug Record: Donor-Based Static Asset Recovery
+
+#### Symptom
+
+After the optional dependency guard landed, source `--help` still failed because `src/skills/bundled/verifyContent.ts` imported bundled markdown files that were missing from the restored tree.
+
+#### Root Cause
+
+The current repository lacked startup-referenced bundled `verify` markdown assets that existed in the donor runnable fork.
+
+#### Decision
+
+Use the donor runnable fork as a selective restoration reference for startup-critical missing assets.
+
+#### Fix
+
+This pass restored:
+- `src/skills/bundled/verify/SKILL.md`
+- `src/skills/bundled/verify/examples/cli.md`
+- `src/skills/bundled/verify/examples/server.md`
+
+These were restored as placeholder baseline assets sufficient for startup/resource loading.
+
+#### Verification
+
+Executed:
+- `bun src/entrypoints/cli.tsx --help`
+
+Observed result:
+- the command completed successfully and printed CLI help
+
+### Validation Notes
+
+Executed runtime validation:
+- `bun src/entrypoints/cli.tsx --version`
+- `bun src/entrypoints/cli.tsx --help`
+- `node cli.js --version`
+- `node scripts/validate-restoration.mjs`
+- `npm run validate:restoration`
+
+Executed repository-wide monitoring validation:
+- `./node_modules/.bin/tsc --noEmit -p tsconfig.json --pretty false`
+
+Current monitoring summary from repository-wide `tsc`:
+- `TS7006`: 828
+- `TS2307`: 288
+- `TS2339`: 270
+- `TS18046`: 156
+- `TS2305`: 115
+
+Interpretation:
+- the runnable-source baseline now passes
+- repository-wide `tsc` still represents deferred debt, not current baseline failure
+
+### Remaining Follow-up
+
+- Continue task `5.x` donor comparison with grouped import candidates rather than one-off file chases.
+- Expand the runnable baseline beyond `--version` and `--help` once the next source flow is chosen.
+- Build a fuller categorized inventory of remaining startup-adjacent missing modules and assets.
+- Keep repository-wide `tsc` as a monitoring surface until a narrower active-path type validation boundary is justified.
 
 ## 2026-04-01 Review Summary
 
@@ -1561,3 +1741,155 @@ After this pass, the leading `tsc --noEmit -p tsconfig.json --pretty false` erro
 - `src/components/permissions/rules/*`
 
 This is the next useful boundary: the remaining first-screen errors are now concentrated in the shared permissions framework rather than individual request UIs.
+
+## 2026-04-03 Debug Record: Runtime Restoration Baseline Round 2
+
+### Donor Comparison Follow-up
+
+I continued the `runtime-restoration-baseline` change with direct comparison against the external runnable fork at `D:\Code\test\test2\ClaudeCode\src` and grouped donor candidates into three buckets:
+
+- startup-critical:
+  - `src/skills/bundled/verify/*`
+  - `src/utils/secureStorage/types.ts`
+  - `src/memdir/memoryShapeTelemetry.ts`
+  - `src/tasks/LocalWorkflowTask/LocalWorkflowTask.ts`
+  - `src/tasks/MonitorMcpTask/MonitorMcpTask.ts`
+- validation-critical:
+  - `src/constants/querySource.ts`
+  - `src/components/ui/option.tsx`
+  - `src/types/fileSuggestion.ts`
+  - `src/types/messageQueueTypes.ts`
+  - `src/types/statusLine.ts`
+  - `src/types/utils.ts`
+  - `src/components/Spinner/types.ts`
+  - `src/services/contextCollapse/persist.ts`
+- deferred:
+  - monitor / workflow / review-artifact UI surfaces and tools
+  - broader telemetry exporter gaps
+  - repository-wide permission-framework type cleanup
+
+### Donor-Based Repairs Applied
+
+I imported or recreated the low-conflict donor files that reduce active missing-module pressure without overriding this repository's current provider/runtime work:
+
+- runtime and startup support:
+  - `src/skills/bundled/verify/SKILL.md`
+  - `src/skills/bundled/verify/examples/cli.md`
+  - `src/skills/bundled/verify/examples/server.md`
+  - `src/utils/secureStorage/types.ts`
+  - `src/memdir/memoryShapeTelemetry.ts`
+  - `src/tasks/LocalWorkflowTask/LocalWorkflowTask.ts`
+  - `src/tasks/MonitorMcpTask/MonitorMcpTask.ts`
+- shared shim / type surfaces:
+  - `src/constants/querySource.ts`
+  - `src/components/ui/option.tsx`
+  - `src/components/Spinner/types.ts`
+  - `src/types/fileSuggestion.ts`
+  - `src/types/messageQueueTypes.ts`
+  - `src/types/statusLine.ts`
+  - `src/types/utils.ts`
+  - `src/services/contextCollapse/persist.ts`
+- deferred feature placeholders, intentionally not on the startup path:
+  - monitor / workflow / review-artifact task, tool, permission, and dialog shells
+
+Where the donor placeholders were too narrow for the current tree, I widened them to a local minimum-compatible surface instead of copying them blindly. In practice that was necessary for:
+
+- `SecureStorage` to expose `name`, `read`, `readAsync`, `update`, and `delete`
+- `memoryShapeTelemetry` to expose `logMemoryWriteShape`
+- `LocalWorkflowTaskState` / `MonitorMcpTaskState` to satisfy `TaskStateBase`
+- `components/ui/option.tsx` to export a type surface instead of a null component
+
+### Validation Status After Donor Round 2
+
+Runtime baseline validation still passes after the donor-based repairs:
+
+- `bun src/entrypoints/cli.tsx --version`
+- `bun src/entrypoints/cli.tsx --help`
+- `node cli.js --version`
+- `npm run validate:restoration`
+
+Repository-wide `tsc` remains a monitoring signal only, but the donor follow-up reduced the missing-module frontier materially:
+
+- previous monitoring snapshot:
+  - `TS7006`: 828
+  - `TS2307`: 288
+  - `TS2339`: 270
+  - `TS18046`: 156
+  - `TS2305`: 115
+- after donor round 2:
+  - `TS7006`: 760
+  - `TS2307`: 208
+  - `TS2339`: 352
+  - `TS18046`: 126
+  - `TS2305`: 123
+
+Interpretation:
+
+- donor follow-up helped on missing modules and some unknown-type propagation
+- it did not make repository-wide `tsc` a near-term gate
+- the next meaningful work clusters are still shared permission-framework typing, telemetry package/version mismatches, and reconstructed generic helper signatures
+
+This confirms the current strategy: keep the runnable-source baseline green, keep using donor code selectively for missing-module restoration, and continue treating full-repo `tsc` as deferred debt unless a failing path is on the active runtime baseline.
+
+## 2026-04-03 Debug Record: Strategy Clarification And Type-Surface Pass
+
+### Strategy Clarification
+
+I revisited the external reconstruction notes and aligned the OpenSpec change artifacts with the actual restoration strategy now in use.
+
+The key clarification is:
+
+- this repository is being repaired with a runnable-restoration strategy, not a full-source-reconstruction strategy
+- the published artifact is known to be missing 100+ feature-gated/internal modules because Bun compile-time elimination removed them before packaging
+- repository-wide `tsc` therefore remains a triage tool and debt signal, not the immediate success gate
+
+To make that explicit for future contributors, I updated:
+
+- `openspec/changes/runtime-restoration-baseline/proposal.md`
+- `openspec/changes/runtime-restoration-baseline/design.md`
+
+The updated artifacts now state that the team should:
+
+- keep the runnable-source baseline green first
+- prefer central compatibility fixes over repeated local workarounds
+- classify missing imports before repair
+- use donor code selectively as a reference, not as an upstream merge target
+- work repository-wide type debt in grouped clusters only when it reduces active-path noise
+
+### Type-Surface Repair Pass
+
+After the strategy update, I continued the current high-leverage declaration/export repair cluster instead of returning to broad file-by-file UI typing work.
+
+This pass widened shared shim surfaces in:
+
+- `src/types/tools.ts`
+- `src/types/message.ts`
+- `src/types/fileSuggestion.ts`
+- `src/types/statusLine.ts`
+- `src/utils/context.ts`
+- `src/utils/effort.ts`
+- `src/utils/model/model.ts`
+- `src/types/restoration-shims.d.ts`
+
+The intent of this pass was to reduce cross-cutting "missing export / missing declaration / unresolved package type" noise before re-entering any large UI family such as permissions.
+
+### Monitoring Result After This Pass
+
+`tsc --noEmit -p tsconfig.json --pretty false` still fails, but the declaration/export pass reduced several error classes:
+
+- previous snapshot:
+  - `TS2305`: 123
+  - `TS2307`: 208
+  - `TS2304`: 22
+  - `TS7016`: 37
+- after this pass:
+  - `TS2305`: 108
+  - `TS2307`: 207
+  - `TS2304`: 21
+  - `TS7016`: 24
+
+Interpretation:
+
+- the grouped type-surface repair strategy is working as intended for shared declaration gaps
+- the next high-signal cluster remains broad exported-type coverage and runtime-safe shims for still-missing published-artifact modules
+- the large permission-framework `TS7006` cluster is still deferred until shared declaration pressure is lower

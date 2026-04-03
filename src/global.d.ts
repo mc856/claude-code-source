@@ -3,6 +3,8 @@ declare const MACRO: {
   BUILD_TIME?: string
   PACKAGE_URL: string
   NATIVE_PACKAGE_URL?: string
+  FEEDBACK_CHANNEL?: string
+  VERSION_CHANGELOG?: string
 }
 
 declare module 'bun:bundle' {

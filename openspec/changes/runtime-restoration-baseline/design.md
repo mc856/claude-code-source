@@ -8,6 +8,11 @@ This repository is an internal mirror reconstructed from a bundled Claude Code r
 
 The restoration effort therefore needs a technical baseline that prioritizes runnable source entrypoints and controlled feature degradation over full parity with internal upstream source or immediate full-repository type closure.
 
+Two external reference points reinforce this:
+
+- the reconstructed-source documentation states that 100+ feature-gated modules are absent from the published artifact because Bun compile-time elimination removed them before release packaging
+- an external runnable fork demonstrates that source restoration becomes tractable when the effort is framed around startup compatibility, guardrails, and selective shims instead of trying to recreate every missing internal module
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -22,6 +27,18 @@ The restoration effort therefore needs a technical baseline that prioritizes run
 - Require repository-wide `tsc --noEmit -p tsconfig.json` to pass before restoration work can be considered successful.
 - Re-implement every feature-gated tool or internal workflow found in decompiled source references.
 - Treat external runnable forks as authoritative product behavior; they are implementation references, not upstream truth.
+
+## Operating Strategy
+
+The operating strategy for this change is:
+
+1. Keep the runnable-source baseline green.
+2. Fix cross-cutting startup and compatibility blockers centrally where possible.
+3. Classify missing modules before repair so the team does not confuse unrecoverable internal code with ordinary missing source.
+4. Import or recreate only the smallest donor-backed surface needed for the active runtime path.
+5. Use repository-wide `tsc` to locate the next blocker cluster, but only promote an error to active work when it blocks the runnable baseline or clearly reduces missing-module pressure.
+
+This strategy intentionally avoids the previous failure mode where the team spent large effort on manual file-by-file `tsc` cleanup without first establishing a stable restoration model.
 
 ## Decisions
 
@@ -48,6 +65,7 @@ Every missing import SHALL be classified into one of four categories:
 Rationale:
 - The mirrored repository references modules that were removed by Bun dead-code elimination and are not recoverable from published artifacts.
 - Treating all missing imports as if they require real implementations leads to wasted effort and incorrect recovery assumptions.
+- The external runnable fork shows that selective shims and guards are enough to restore active startup paths without recreating the entire internal feature surface.
 
 Alternatives considered:
 - Recreate every missing module. Rejected because many modules are internal-only and unrecoverable.
@@ -75,6 +93,7 @@ Restoration validation SHALL be split into:
 
 Rationale:
 - This keeps validation aligned with restoration goals and avoids blocking on unrelated reconstructed-source drift.
+- It also provides a way to continue making progress even when the repository still contains large classes of deferred errors that are structurally expected in a mirrored source tree.
 
 Alternatives considered:
 - Single validation gate using full `tsc`. Rejected because it obscures restoration progress and encourages low-signal cleanup work.
@@ -85,6 +104,22 @@ The external repaired fork may be used to identify candidate shims, guards, and 
 
 Rationale:
 - It contains useful restoration decisions and missing files, but this repository already has enterprise/provider changes that differ from a pure restoration fork.
+
+## Practical Triage Rules
+
+When a new error or missing import is encountered, use the following order:
+
+1. Does it break a defined runnable-source command such as `--version`, `--help`, startup bootstrap, or the current active validation path?
+If yes, treat it as active restoration work.
+
+2. Is it a cross-cutting compatibility issue such as `MACRO`, `feature()`, generated declarations, or missing published-artifact shims?
+If yes, prefer a central fix or shared shim over patching many callsites.
+
+3. Is it an internal-only or feature-gated path that is not on the runnable baseline?
+If yes, prefer an explicit guard, placeholder, or deferred classification.
+
+4. Is it a broad repository-wide typing issue that does not block runtime?
+If yes, record it as debt and only work it in grouped clusters when it materially reduces active-path noise.
 
 ## Risks / Trade-offs
 

@@ -1,4 +1,3 @@
-import { BROWSER_TOOLS } from '@ant/claude-for-chrome-mcp'
 import { chmod, mkdir, readFile, writeFile } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
@@ -36,6 +35,39 @@ const CHROME_EXTENSION_RECONNECT_URL = 'https://clau.de/chrome/reconnect'
 
 const NATIVE_HOST_IDENTIFIER = 'com.anthropic.claude_code_browser_extension'
 const NATIVE_HOST_MANIFEST_NAME = `${NATIVE_HOST_IDENTIFIER}.json`
+type BrowserTool = {
+  name: string
+}
+
+let cachedBrowserTools: BrowserTool[] | null = null
+
+function getBrowserTools(): BrowserTool[] {
+  if (cachedBrowserTools) {
+    return cachedBrowserTools
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('@ant/claude-for-chrome-mcp') as {
+      BROWSER_TOOLS?: BrowserTool[]
+    }
+    cachedBrowserTools = mod.BROWSER_TOOLS ?? []
+  } catch {
+    cachedBrowserTools = []
+  }
+
+  return cachedBrowserTools
+}
+
+function assertClaudeInChromePackageAvailable(): void {
+  if (getBrowserTools().length > 0) {
+    return
+  }
+
+  throw new Error(
+    'Claude in Chrome requires @ant/claude-for-chrome-mcp, which is not available in the current source-restoration baseline.',
+  )
+}
 
 export function shouldEnableClaudeInChrome(chromeFlag?: boolean): boolean {
   // Disable by default in non-interactive sessions (e.g., SDK, CI)
@@ -95,9 +127,10 @@ export function setupClaudeInChrome(): {
   systemPrompt: string
 } {
   assertAnthropicProvider('Claude in Chrome')
+  assertClaudeInChromePackageAvailable()
 
   const isNativeBuild = isInBundledMode()
-  const allowedTools = BROWSER_TOOLS.map(
+  const allowedTools = getBrowserTools().map(
     tool => `mcp__claude-in-chrome__${tool.name}`,
   )
 
