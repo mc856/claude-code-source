@@ -2277,3 +2277,68 @@ Follow-up decision:
 - Telemetry source-level cleanup is not justified until dependency and shim alignment are fully accounted for.
 - The repo has tracked `node_modules` files. Running `bun install` touched many of them; those install artifacts should not be considered source changes for this OpenSpec work.
 - Follow-up repository hygiene decision: remove tracked `node_modules` files from the Git index and rely on `package.json` + `bun.lock` + local `shims/*` to reproduce dependencies. This preserves the local `node_modules` directory but prevents future `bun install` runs from polluting `git status`.
+
+## 2026-04-07 Debug Record: Runtime Activation Follow-up Boundary
+
+### Review Summary
+
+After donor infrastructure alignment, the repository now has three distinct states that must not be conflated:
+
+- completed restoration baseline
+- donor-aligned development scanner behavior
+- not-yet-activated direct source runtime
+
+Validation in the current workspace confirms:
+
+- `bun src/entrypoints/cli.tsx --version` passes
+- `bun src/entrypoints/cli.tsx --help` passes
+- `npm run validate:restoration` passes
+- `bun run dev` does not represent real runtime activation; it is scanner-mode behavior while unresolved relative imports remain
+- `bun src/entrypoints/cli.tsx --bare -p "Say OK only."` still requires a narrower blocker investigation because startup progresses but the flow does not complete inside the current bounded window
+
+### Debug Record: Scanner Versus Runtime Activation
+
+#### Symptom
+
+The repository can appear both "working" and "not running" depending on which command a maintainer chooses:
+
+- baseline validation commands succeed
+- `bun run dev` stops early and reports unresolved relative imports
+
+#### Root Cause
+
+`src/dev-entry.ts` is currently a restoration launcher and scanner, not the canonical runtime entrypoint. It injects source-runtime macro compatibility, inventories unresolved relative imports, and exits early until forwarding criteria are satisfied.
+
+#### Decision
+
+Stop treating `bun run dev` failure as proof that the direct source runtime has regressed.
+
+Treat follow-up work in two parts:
+
+- direct runtime activation on `src/entrypoints/cli.tsx`
+- unresolved-import triage from `src/dev-entry.ts`
+
+#### Verification
+
+Executed:
+
+- `bun run ./src/dev-entry.ts --version`
+- `bun run ./src/dev-entry.ts`
+- `bun src/entrypoints/cli.tsx --version`
+- `bun src/entrypoints/cli.tsx --help`
+- `npm run validate:restoration`
+
+Observed result:
+
+- the launcher reports `missing_relative_imports=86`
+- the direct source baseline remains green
+
+### Follow-up Decision
+
+Create a dedicated follow-up change, `restored-runtime-activation`, for:
+
+- minimal direct source runtime activation
+- `--bare -p` stall isolation
+- unresolved relative-import inventory and classification
+
+Do not pull this follow-up back into `runtime-restoration-baseline` or continue treating it as implied remaining work inside `high-yield-debt-reduction`.

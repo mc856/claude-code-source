@@ -1,6 +1,7 @@
 node_modules/
 .bun/
 bun.lockb
+.vscode/
 tsc-errors-*.txt
 .tmp-trace-*.txt
 .tmp-tsc-*.txt

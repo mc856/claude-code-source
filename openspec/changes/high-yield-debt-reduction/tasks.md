@@ -19,3 +19,7 @@
 
 - [x] 4.1 Update `openspec/changes/implementation.md` with cluster treatment decisions, validation results, and deferred debt inventory
 - [x] 4.2 Reassess whether telemetry still needs a dedicated source-level follow-up after donor infrastructure alignment
+
+## 5. Boundary Note
+
+- [x] 5.1 Record that direct runtime activation and unresolved-import triage move to the dedicated `restored-runtime-activation` follow-up change

@@ -112,3 +112,7 @@ A pass is considered improved when:
 - Should the repo use donor `bun.lock` directly, or regenerate `bun.lock` from the merged dependency manifest?
 - Should `src/dev-entry.ts` become the primary `bun run dev` path while `src/entrypoints/cli.tsx` remains the direct baseline path?
 - After dependency restoration, is telemetry still a source-code problem or only a runtime configuration problem?
+
+## Follow-up Boundary
+
+This change stops at donor infrastructure alignment and debt-treatment decisions. Direct runtime activation, `--bare -p` stall isolation, and formal unresolved-import triage are tracked in `restored-runtime-activation` so they can be executed against a narrower runtime-oriented contract.

@@ -27,3 +27,7 @@
 - [x] 5.1 Compare the current repository against the external runnable fork and group donor candidates by startup-critical, validation-critical, and deferred.
 - [x] 5.2 Import or recreate the approved startup-critical donor fixes with review against this repository's existing provider changes.
 - [x] 5.3 Re-validate the runnable baseline after donor-based repairs and update the restoration status in the execution record.
+
+## 6. Follow-up Boundary
+
+- [x] 6.1 Record that direct runtime activation and unresolved-import triage proceed in `restored-runtime-activation`, while this change remains the completed baseline contract

@@ -25,3 +25,7 @@ The current `runtime-restoration-baseline` change established a runnable source 
 - Affects `src/components/permissions/rules/*` and adjacent permission-management UI flows.
 - Affects dependency restoration, `shims/*`, `vendor/*`, restoration launcher behavior, and telemetry/native import compatibility that can be solved at package boundaries.
 - Affects how repository-wide `tsc` output is interpreted, grouped, and used for follow-on work.
+
+## Follow-up Boundary
+
+The donor infrastructure pass established the restoration launcher and narrowed several package-boundary blockers, but it did not activate the direct source runtime end-to-end and it did not formalize treatment of the unresolved relative-import inventory. That follow-up work now moves to `restored-runtime-activation`.
