@@ -56,11 +56,18 @@ const getRipgrepConfig = memoize((): RipgrepConfig => {
     }
   }
 
-  const rgRoot = path.resolve(__dirname, 'vendor', 'ripgrep')
-  const command =
+  const binaryName = process.platform === 'win32' ? 'rg.exe' : 'rg'
+  const platformDir =
     process.platform === 'win32'
-      ? path.resolve(rgRoot, `${process.arch}-win32`, 'rg.exe')
-      : path.resolve(rgRoot, `${process.arch}-${process.platform}`, 'rg')
+      ? `${process.arch}-win32`
+      : `${process.arch}-${process.platform}`
+  const commandCandidates = [
+    // npm compiled layout
+    path.resolve(__dirname, 'vendor', 'ripgrep', platformDir, binaryName),
+    // restored source-workspace layout
+    path.resolve(__dirname, '..', '..', 'vendor', 'ripgrep', platformDir, binaryName),
+  ]
+  const command = commandCandidates.find(candidate => existsSync(candidate)) ?? commandCandidates[0]
 
   if (!existsSync(command)) {
     const { cmd: systemPath } = findExecutable('rg', [])
