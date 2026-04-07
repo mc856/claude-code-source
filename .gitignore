@@ -4,3 +4,5 @@ bun.lockb
 tsc-errors-*.txt
 .tmp-trace-*.txt
 .tmp-tsc-*.txt
+.tmp-run*.log
+.tmp-help-*.txt

@@ -1893,3 +1893,387 @@ Interpretation:
 - the grouped type-surface repair strategy is working as intended for shared declaration gaps
 - the next high-signal cluster remains broad exported-type coverage and runtime-safe shims for still-missing published-artifact modules
 - the large permission-framework `TS7006` cluster is still deferred until shared declaration pressure is lower
+
+## 2026-04-06 Debug Record: High-Yield Debt Reduction Recovery Assessment
+
+### Review Summary
+
+Work resumed under `high-yield-debt-reduction` after a pause. The first session goal was not to resume broad implementation immediately, but to re-establish the current baseline and lock the second-phase execution boundary back to the new change.
+
+Recovery validation results from the first resume probe were initially noisy because slow commands were run in parallel. Re-running the same checks sequentially produced the expected baseline:
+
+- `bun src/entrypoints/cli.tsx --version`: passing
+- `bun src/entrypoints/cli.tsx --help`: passing
+- `node cli.js --version`: passing
+- `node scripts/validate-restoration.mjs`: passing
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false`: still failing globally, as expected for deferred debt monitoring
+
+Interpretation:
+
+- the runnable baseline is still green
+- the brief timeout concern was environmental noise during parallel validation, not a confirmed product regression
+- second-phase debt reduction can proceed so long as baseline checks stay sequential and explicit in the execution record
+
+### Cluster Treatment Decisions
+
+The first implementation clusters for `high-yield-debt-reduction` are now fixed as:
+
+- `src/components/permissions/rules/*`
+  - treatment: localized rewrite at the subarea level, with some orchestration files allowed to stay as bounded cleanup if a rewrite would expand too far
+- `src/utils/telemetry/*`
+  - treatment: compatibility-layer replacement, not repo-wide typing cleanup
+
+This keeps the second-phase scope aligned with the design:
+
+- choose bounded clusters
+- prefer high-leverage local restructuring
+- avoid broad repo-wide `tsc` chasing
+
+### Deferred Module Boundaries
+
+The following noisy areas are explicitly deferred for this change unless they become direct runnable-baseline blockers:
+
+- core runtime and startup systems
+  - `src/entrypoints/*`
+  - `src/state/*`
+  - `src/utils/sessionStorage.ts`
+  - `src/utils/task/*`
+  - provider/tool execution cores
+- low-value shim territory
+  - feature-gated or Bun-elided internal modules that are already handled through guards or placeholders
+  - optional dependency paths that already have degraded behavior
+- broad cross-repo UI families outside the first selected clusters
+  - prompt input and onboarding surfaces
+  - unrelated permission request dialogs outside `permissions/rules`
+
+### Permissions Rules Cluster Map
+
+The `src/components/permissions/rules/*` cluster is now split into three bounded subareas:
+
+- rule authoring helpers
+  - `AddPermissionRules.tsx`
+  - `PermissionRuleInput.tsx`
+  - `PermissionRuleDescription.tsx`
+  - preferred treatment: localized rewrite
+- workspace directory flows
+  - `AddWorkspaceDirectory.tsx`
+  - `RemoveWorkspaceDirectory.tsx`
+  - `WorkspaceTab.tsx`
+  - preferred treatment: localized rewrite
+- rule list / navigation / recent-denial orchestration
+  - `PermissionRuleList.tsx`
+  - `RecentDenialsTab.tsx`
+  - preferred treatment: bounded cleanup first, with localized extraction only if the file remains too unstable
+
+This split is intentional:
+
+- it creates a safe entry point for `2.2`
+- it avoids starting with the largest orchestration file
+- it preserves permission persistence behavior as a hard constraint
+
+### Next-Step Decision
+
+The next implementation step should be:
+
+- re-triage the source help timeout just enough to confirm whether the runnable baseline has truly regressed or whether the timeout is environmental
+- if the help path is still a real blocker, repair it before taking on behavior-changing debt work
+- once the baseline is confirmed, start `2.2` in the smallest `permissions/rules` subarea:
+  - rule authoring helpers first
+  - workspace directory flows second
+  - `PermissionRuleList.tsx` last
+
+This means the recovery session completed:
+
+- task `1.1`
+- task `1.2`
+- task `2.1`
+
+and then moved into the first bounded implementation pass once the baseline was re-confirmed.
+
+## 2026-04-06 Debug Record: Permissions Rules First Pass
+
+### Review Summary
+
+The first implementation pass for `high-yield-debt-reduction` started with the smallest `permissions/rules` subarea:
+
+- `AddPermissionRules.tsx`
+- `PermissionRuleDescription.tsx`
+- `PermissionRuleInput.tsx`
+
+These files were still in decompiled/react-compiler form and were good candidates for a localized rewrite that preserved existing behavior while improving maintainability and removing local type drift.
+
+### Refactor Decision
+
+This pass treated the rule-authoring helpers as a localized rewrite rather than continuing line-by-line type patching.
+
+Rationale:
+
+- the files were self-contained
+- they do not own permission persistence state by themselves
+- their behavior is easy to preserve while rewriting into normal TSX
+- this is the intended shape of the new change: rewrite small, high-yield leaves before touching large orchestration files
+
+### Changes Applied
+
+I replaced the decompiled versions of:
+
+- `src/components/permissions/rules/AddPermissionRules.tsx`
+- `src/components/permissions/rules/PermissionRuleDescription.tsx`
+- `src/components/permissions/rules/PermissionRuleInput.tsx`
+
+with cleaned-up TSX implementations that:
+
+- preserve the existing permission-update and unreachable-rule detection flow
+- keep the same save-destination options and permission-rule parsing behavior
+- remove local implicit-`any` drift and reconstructed control-flow noise
+- keep the cluster boundary tight by avoiding changes to shared permission persistence models
+
+### Validation Notes
+
+Executed baseline validation after the rewrite:
+
+- `node scripts/validate-restoration.mjs`
+
+Observed result:
+
+- source version: passing
+- source help: passing
+- prebuilt version: passing
+
+Executed repository-wide monitoring validation:
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false`
+
+Local cluster interpretation after this pass:
+
+- `AddPermissionRules.tsx` no longer appears in the `tsc` output
+- `PermissionRuleDescription.tsx` no longer appears in the `tsc` output
+- `PermissionRuleInput.tsx` no longer appears in the `tsc` output
+- the active `permissions/rules` frontier has moved to:
+  - `AddWorkspaceDirectory.tsx`
+  - `PermissionRuleList.tsx`
+  - `RecentDenialsTab.tsx`
+  - `RemoveWorkspaceDirectory.tsx`
+  - `WorkspaceTab.tsx`
+
+This is the expected localized win:
+
+- the first leaf subarea has been normalized
+- the runnable baseline remained green
+- the remaining cluster pressure is now concentrated in workspace and orchestration files
+
+### Next Follow-up
+
+The next recommended implementation step is:
+
+- continue `permissions/rules` with the workspace directory subarea:
+  - `AddWorkspaceDirectory.tsx`
+  - `RemoveWorkspaceDirectory.tsx`
+  - `WorkspaceTab.tsx`
+
+and only then return to the larger orchestration file:
+
+- `PermissionRuleList.tsx`
+
+This keeps the high-yield debt-reduction strategy intact and avoids starting the second pass with the most entangled file in the cluster.
+
+## 2026-04-06 Debug Record: Permissions Rules Workspace Pass
+
+### Review Summary
+
+I continued the `permissions/rules` cluster with the second bounded subarea:
+
+- `AddWorkspaceDirectory.tsx`
+- `RemoveWorkspaceDirectory.tsx`
+- `WorkspaceTab.tsx`
+
+As with the first helper pass, these files were still in decompiled/react-compiler form and were better treated as localized rewrites than as incremental type patch targets.
+
+### Refactor Decision
+
+This pass kept the same constraints as the first one:
+
+- preserve permission behavior
+- preserve runnable baseline
+- avoid expanding into shared permission persistence model changes
+
+The chosen treatment was again localized rewrite, because these files are leaf-oriented UI flow handlers with straightforward behavior.
+
+### Changes Applied
+
+I replaced the decompiled versions of:
+
+- `src/components/permissions/rules/AddWorkspaceDirectory.tsx`
+- `src/components/permissions/rules/RemoveWorkspaceDirectory.tsx`
+- `src/components/permissions/rules/WorkspaceTab.tsx`
+
+with normal TSX implementations that:
+
+- preserve directory validation, suggestion, and confirmation behavior
+- keep the existing add/remove workspace-directory flow
+- keep current interaction with permission updates and original working-directory display
+- remove local implicit-`any` drift, reconstructed cache scaffolding, and overcomplicated control flow
+
+### Validation Notes
+
+Executed baseline validation after the workspace pass:
+
+- `node scripts/validate-restoration.mjs`
+
+Observed result:
+
+- source version: passing
+- source help: passing
+- prebuilt version: passing
+
+Executed repository-wide monitoring validation:
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false`
+
+Local cluster interpretation after this pass:
+
+- `AddWorkspaceDirectory.tsx` no longer appears in the `tsc` output
+- `RemoveWorkspaceDirectory.tsx` no longer appears in the `tsc` output
+- `WorkspaceTab.tsx` no longer appears in the `tsc` output
+- the remaining active `permissions/rules` frontier is now concentrated in:
+  - `PermissionRuleList.tsx`
+  - `RecentDenialsTab.tsx`
+
+This is the expected next boundary:
+
+- the rule-authoring and workspace leaf flows are now normalized
+- the only remaining debt in the cluster is the larger orchestration/list-management layer
+
+### Next Follow-up
+
+The next implementation step should target:
+
+- `RecentDenialsTab.tsx`
+- `PermissionRuleList.tsx`
+
+in that order if possible, or as a paired pass if `PermissionRuleList.tsx` depends too directly on the denials tab typing surface.
+
+## 2026-04-06 Debug Record: Permissions Rules Orchestration Pass
+
+### Review Summary
+
+I completed the remaining `permissions/rules` orchestration frontier by replacing:
+
+- `RecentDenialsTab.tsx`
+- `PermissionRuleList.tsx`
+
+with normal TSX implementations.
+
+This pass intentionally stopped at the cluster boundary and did not expand into
+telemetry or shared runtime systems.
+
+### Refactor Decision
+
+The treatment remained localized rewrite rather than patch-in-place because:
+
+- both files were still dominated by decompiled react-compiler cache scaffolding
+- the remaining errors were concentrated in inferred state and prop surfaces
+- behavior could be preserved more safely by reconstructing the component logic
+  directly than by continuing to patch `never` / implicit-`any` fallout
+
+### Changes Applied
+
+The rewritten versions preserve the current interaction model for:
+
+- recent denial approval and retry selection
+- rule search / list / selection flow
+- rule deletion flow
+- add-rule and workspace add/remove transitions
+- permission change summary generation on exit
+- header-focus coordination with the shared tab system
+
+The pass also normalized file encoding for `PermissionRuleList.tsx`, which had
+been in a non-UTF8 state that blocked `apply_patch`.
+
+### Validation Notes
+
+Executed baseline validation after the orchestration pass:
+
+- `node scripts/validate-restoration.mjs`
+
+Observed result:
+
+- source version: passing
+- source help: passing
+- prebuilt version: passing
+
+Executed repository-wide monitoring validation:
+
+- `node node_modules/typescript/bin/tsc --noEmit --pretty false`
+
+Local cluster interpretation after this pass:
+
+- `RecentDenialsTab.tsx` no longer appears in the `tsc` output
+- `PermissionRuleList.tsx` no longer appears in the `tsc` output
+- no files from the targeted `permissions/rules` cluster remain in the current
+  `tsc` monitoring output
+
+This is the intended cluster outcome:
+
+- the first high-yield debt-reduction cluster is now out of the active error
+  frontier
+- the runnable baseline remains green
+- unrelated repository-wide debt remains deferred per the change strategy
+
+### Next Follow-up
+
+The next recommended implementation step is to move to the second planned
+cluster:
+
+- define the supported telemetry compatibility surface
+- implement the bounded telemetry compatibility-layer replacement
+- validate local telemetry debt reduction while preserving the runnable baseline
+## High-Yield Debt Reduction: Donor Infrastructure Pivot
+
+Date: 2026-04-07
+
+The external restoration sample changed the remaining strategy for this change. The sample's "8 source files" result is not just a smaller patch set; it depends on infrastructure outside `src`:
+
+- a restoration dependency surface and lockfile
+- local `shims/*` packages for private/native modules
+- `vendor/*` TypeScript replacements for native bindings
+- a `src/dev-entry.ts` launcher that injects `MACRO` and reports missing restored imports
+- a restoration TypeScript posture that avoids using repo-wide strict `tsc` as the first gate
+
+Decision: stop treating telemetry as a source rewrite first. For this phase, the remaining treatment is donor restoration infrastructure alignment.
+
+Implemented in this pass:
+
+- Updated `high-yield-debt-reduction` proposal, design, specs, and tasks to reflect the donor-infrastructure pivot.
+- Added `shims/*` from `D:\Code\test\test2\ClaudeCode\shims`.
+- Confirmed existing `vendor/*-src` files already match the donor sample by SHA-256 and did not overwrite them.
+- Added `src/dev-entry.ts` as a restored development launcher and wired `package.json` `dev`, `start`, and `version:restored` scripts to it.
+- Merged the donor dependency surface into `package.json` without replacing current package identity, version, bin, or validation script.
+- Moved the direct publishing guard from `prepare` to `prepublishOnly` so local `bun install` works while publish protection remains.
+- Added OpenTelemetry OTLP/prometheus exporter packages because the current source imports them dynamically and they are dependency-boundary issues, not source rewrite issues.
+- Reverted telemetry imports back to normal package entrypoints after restoring complete OpenTelemetry packages.
+- Kept the earlier ripgrep fallback: missing bundled `src/utils/vendor/ripgrep/.../rg.exe` falls back to system `rg`.
+- Migrated the donor `main.tsx` Commander compatibility patch: `-d2e` is rewritten to `--debug-to-stderr`, and Commander only registers the legal long flag.
+
+Validation:
+
+- `bun install` passes after changing `prepare` to `prepublishOnly`.
+- `bun -e "import('@opentelemetry/sdk-metrics')"` passes and confirms a complete OpenTelemetry package is installed.
+- `bun -e "import('@ant/computer-use-mcp')"` passes and confirms local shim packages resolve.
+- `bun -e` import checks for OTLP HTTP metric/log/trace exporters pass.
+- `npm run validate:restoration` passes.
+- `bun run dev -- --version` passes through the restored dev launcher and reports `missing_relative_imports=86`.
+- `bun src/entrypoints/cli.tsx --bare -p "Say OK only." --debug --debug-file .tmp-run-donor-infra.log` still times out after 120s, but the previous `@opentelemetry/sdk-metrics` missing-package error and private/native shim import errors no longer appear. The log reaches provider validation and startup command loading, then ends after ripgrep fallback.
+
+TypeScript monitoring:
+
+- `TS2307` decreased to `153` after dependency restoration.
+- Remaining telemetry TypeScript errors are now mostly export/type-surface mismatch (`TS2305`) rather than missing package runtime blockers.
+- Remaining `@ant/computer-use-mcp` errors are shim type-surface mismatch and should be treated as a narrow shim follow-up if needed.
+
+Follow-up decision:
+
+- Do not resume broad telemetry source rewrites in this change. If `-p` remains blocked, investigate the next runtime stall from the debug log and process lifecycle.
+- Telemetry source-level cleanup is not justified until dependency and shim alignment are fully accounted for.
+- The repo has tracked `node_modules` files. Running `bun install` touched many of them; those install artifacts should not be considered source changes for this OpenSpec work.
+- Follow-up repository hygiene decision: remove tracked `node_modules` files from the Git index and rely on `package.json` + `bun.lock` + local `shims/*` to reproduce dependencies. This preserves the local `node_modules` directory but prevents future `bun install` runs from polluting `git status`.

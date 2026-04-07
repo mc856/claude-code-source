@@ -1,80 +1,77 @@
 ## Context
 
-The repository now has a working runnable-source baseline, but long-tail debt still distorts maintenance cost. The remaining error surface is not uniform: some areas are mostly decompiled-source type drift, some are version-mismatch compatibility problems, and some are low-value feature-gated gaps that should remain shimmed.
+The repository now has a working runnable-source baseline, but long-tail debt still distorts maintenance cost. The remaining error surface is not uniform: some areas are decompiled-source type drift, some are dependency or package-boundary drift, and some are low-value feature-gated gaps that should remain shimmed.
 
-Recent review shows two clusters with unusually high return on targeted restructuring:
+The first high-yield cluster, `src/components/permissions/rules/*`, has already been treated as a localized rewrite. It was useful for local maintainability, but the later runtime investigation showed that continuing into telemetry source rewrites is lower leverage than aligning the donor restoration infrastructure first.
 
-- `src/components/permissions/rules/*`
-  - many related UI files
-  - heavy callback and state typing drift
-  - localized behavior that can be rewritten without touching the main runtime core
-- `src/utils/telemetry/*`
-  - significant dependency/export mismatch
-  - compatibility drift concentrated around adapter boundaries
-  - lower user-visible product risk than rewriting core CLI/session flows
+The external restoration sample appears small at the source level because much of its restoration work lives outside `src`:
 
-This phase must not silently expand back into a repo-wide cleanup effort. It should use the runnable baseline created by `runtime-restoration-baseline` as a hard boundary and only take on debt work with clear leverage.
+- restoration-oriented dependency manifest and lockfile
+- local `shims/*` packages for private/native modules
+- `vendor/*` TypeScript replacements for native bindings
+- `src/dev-entry.ts` for `MACRO` injection and missing-import diagnostics
+- a restoration TypeScript posture that does not treat repo-wide strict type cleanup as the first gate
+
+This change now pivots from "telemetry source rewrite" to "donor infrastructure alignment" for the remaining work.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Define a repeatable triage model for deciding whether a debt cluster should be rewritten, shimmed, or deferred.
-- Reduce maintenance cost in selected high-yield clusters while keeping product behavior stable.
-- Preserve the current runnable-source validation baseline throughout the refactor work.
-- Measure progress by cluster-level improvement, not by whole-repo type cleanliness.
-- Create a path for follow-on debt work that is explicitly modular and bounded.
+- Preserve the runnable baseline established by `runtime-restoration-baseline`.
+- Keep the completed `permissions/rules` localized rewrite as the first debt-reduction result.
+- Align donor restoration infrastructure where it can reduce source-level patching: dependencies, shims, vendor replacements, and dev entry behavior.
+- Avoid overwriting current package identity or unrelated runtime fixes when merging donor pieces.
+- Reassess telemetry after dependency/package-boundary alignment before deciding whether it needs source-level rewrite.
 
 **Non-Goals:**
 - Achieve full-repository `tsc` success in this change.
 - Rewrite core runtime flows such as entrypoints, app state, session storage, task framework, or model/tool execution pipelines.
-- Replace every decompiled-source artifact that still has weak typing.
-- Treat all remaining TypeScript errors as equally valuable to fix.
+- Blindly replace the current repository with the donor repository.
+- Continue broad source-level telemetry rewrites before fixing package-boundary restoration issues.
 
 ## Decisions
 
-### 1. Use cluster-scoped debt reduction instead of repo-wide cleanup
+### 1. Keep debt work cluster-scoped
 
-Debt work SHALL be organized around bounded clusters with a named owner surface, rather than around raw `tsc` error lists.
+Debt work SHALL remain organized around bounded clusters with a named owner surface.
 
 Rationale:
-- The current error surface is too broad to act on directly.
 - Cluster boundaries make validation and rollback practical.
 - This avoids returning to low-signal file-by-file cleanup.
 
-Alternatives considered:
-- Continue top-down repo-wide `tsc` cleanup. Rejected because it recreates the same low-leverage workflow.
+### 2. Treat `permissions/rules` as complete for this phase
 
-### 2. Start with `permissions/rules` and telemetry
-
-The first targeted clusters SHALL be:
-- `src/components/permissions/rules/*`
-- `src/utils/telemetry/*`
+The `permissions/rules` cluster SHALL remain the completed localized rewrite result for this change.
 
 Rationale:
-- Both clusters have concentrated debt and limited blast radius relative to core runtime systems.
-- `permissions/rules` is a strong candidate for localized component cleanup or rewrite.
-- telemetry is a strong candidate for compatibility-layer replacement because much of its debt comes from dependency/API drift rather than product-defining behavior.
+- The cluster no longer appears in the current local TypeScript hot path.
+- Continuing to expand UI cleanup would distract from the runtime blockers now observed in real `-p` testing.
 
-Alternatives considered:
-- Start with `sessionStorage`, task framework, or provider/session core. Rejected because those modules are more behavior-critical and riskier to rewrite.
+### 3. Prefer donor infrastructure alignment before telemetry source rewrites
 
-### 3. Choose one of three treatments for each cluster
+When a debt cluster is caused by missing dependencies, incomplete installed packages, private/native imports, or absent native bindings, the change SHALL prefer infrastructure alignment before source rewrites.
 
-Each targeted cluster SHALL be assigned one primary treatment:
-- localized rewrite
-- compatibility-layer replacement
-- bounded type-surface cleanup
+The selected donor infrastructure pieces are:
+
+- dependency surface from donor `package.json`, merged without replacing current package identity
+- `shims/*` local packages for private/native modules
+- `vendor/*` TypeScript native-binding replacements, reusing existing current files where already present
+- `src/dev-entry.ts` behavior for restored development runs and missing import diagnostics
+- restoration-oriented TypeScript posture for future validation, not repo-wide strict cleanup
 
 Rationale:
-- Different clusters fail for different reasons.
-- Forcing every cluster into a single “fix typings” workflow leads to poor results.
+- The donor sample's small source patch count depends on this infrastructure.
+- Current OpenTelemetry and native import failures are package-boundary symptoms, not necessarily source design problems.
+- Solving these once at package/runtime boundaries is lower risk than scattered source patches.
 
 Alternatives considered:
-- Default every cluster to local typing cleanup. Rejected because some areas are structurally easier to rewrite than to patch.
+- Continue telemetry source rewrites. Rejected because current telemetry failures are largely explained by incomplete dependency installation and package entrypoint drift.
+- Copy the donor repository wholesale. Rejected because this would discard current package metadata and previously completed fixes.
 
 ### 4. Keep the runnable baseline as the hard gate
 
-Every debt-reduction pass SHALL preserve:
+Every infrastructure pass SHALL preserve:
+
 - `bun src/entrypoints/cli.tsx --version`
 - `bun src/entrypoints/cli.tsx --help`
 - `node cli.js --version`
@@ -84,42 +81,34 @@ Rationale:
 - This prevents cleanup work from regressing the restoration milestone already achieved.
 - It keeps follow-on work aligned with the first-phase contract.
 
-Alternatives considered:
-- Use only cluster-local validation. Rejected because regressions can escape into startup paths through shared imports.
+### 5. Measure output by runtime leverage and local error reduction
 
-### 5. Measure output by maintainability and local error reduction, not only global counts
+A pass is considered improved when:
 
-A cluster is considered improved when:
-- its code structure is materially simpler or better bounded than before
-- its targeted validation passes
-- its local `tsc` error pressure is reduced
-- the runnable baseline remains green
-
-Rationale:
-- Whole-repo TypeScript counts can hide whether the touched area is actually healthier.
-- The team needs evidence that refactor effort reduced future maintenance cost.
-
-Alternatives considered:
-- Use only global error deltas. Rejected because they do not capture localized wins reliably.
+- package-level or shim-level blockers are reduced
+- runnable baseline remains green
+- real runtime testing gets farther than before or produces a narrower blocker
+- unrelated repo-wide TypeScript debt remains explicitly deferred
 
 ## Risks / Trade-offs
 
-- [A “local rewrite” drifts from current behavior] → Keep rewrites bounded to localized clusters and validate against existing user-visible flows.
-- [Debt work expands back into broad cleanup] → Require explicit cluster selection before implementation and defer unrelated errors.
-- [Telemetry changes mask unsupported dependency combinations] → Use compatibility boundaries and document degraded/unsupported exporter paths.
-- [Permission UI refactor leaks into core permission model changes] → Keep data-shape and persistence behavior stable unless a separate proposal changes requirements.
-- [Global `tsc` still looks noisy after local wins] → Record cluster-level results explicitly instead of treating unchanged global debt as failure.
+- [Donor dependency versions drift] -> Prefer lockfile-based install or record when fresh dependency resolution is used.
+- [Local shims hide unsupported functionality] -> Keep shim behavior explicitly degraded and document it.
+- [Package merge overwrites current metadata] -> Merge dependencies/scripts only; preserve current package name, version, bin, license, and validation script.
+- [Telemetry still hangs after dependency alignment] -> Treat that as a narrower runtime follow-up, not proof that source rewrites should resume broadly.
+- [Global `tsc` still looks noisy] -> Record cluster-level results instead of treating unchanged global debt as failure.
 
 ## Migration Plan
 
-1. Keep `runtime-restoration-baseline` as the finished first-phase baseline.
-2. Inventory the first two high-yield clusters and record their treatment type.
-3. Implement cluster-by-cluster changes behind the existing runnable validation gate.
-4. Re-run baseline validation after each cluster pass and record local `tsc` changes.
-5. Defer untouched repo-wide debt to later bounded follow-up changes.
+1. Preserve `runtime-restoration-baseline` as the finished first-phase baseline.
+2. Keep the completed `permissions/rules` cleanup as done.
+3. Migrate donor infrastructure in bounded pieces: `shims/*`, `vendor/*`, dependency surface, and dev-entry behavior.
+4. Re-run runnable baseline validation after the infrastructure pass.
+5. Re-test the real `-p` startup path and inspect whether telemetry/native import blockers remain.
+6. Decide whether telemetry needs a separate source-level follow-up after infrastructure alignment.
 
 ## Open Questions
 
-- Should `permissions/rules` be treated as one refactor unit or split into list-management and per-dialog subclusters?
-- Should telemetry target a minimal supported exporter subset first, or maintain placeholder support for all referenced exporter types?
-- Is a dedicated filtered TypeScript command needed for cluster-level validation, or is file-scoped monitoring sufficient for this phase?
+- Should the repo use donor `bun.lock` directly, or regenerate `bun.lock` from the merged dependency manifest?
+- Should `src/dev-entry.ts` become the primary `bun run dev` path while `src/entrypoints/cli.tsx` remains the direct baseline path?
+- After dependency restoration, is telemetry still a source-code problem or only a runtime configuration problem?

@@ -14,6 +14,13 @@ Debt-reduction validation SHALL record localized maintainability or error-surfac
 - **WHEN** a debt-reduction pass is documented
 - **THEN** the execution record SHALL identify the touched cluster, the chosen treatment, and the observed local validation or error reduction
 
+### Requirement: Infrastructure validation SHALL preserve package-level intent
+When donor restoration infrastructure is migrated, validation SHALL confirm the current package identity and existing runnable restoration baseline remain intact.
+
+#### Scenario: Migrating donor dependencies and shims
+- **WHEN** donor `package.json`, `bun.lock`, `shims/*`, `vendor/*`, or development entry behavior is used as a reference
+- **THEN** the implementation SHALL avoid blindly overwriting current package metadata and SHALL record which donor pieces were merged versus deferred
+
 ### Requirement: Unrelated repository-wide debt SHALL remain deferred
 Validation for this change SHALL NOT fail solely because unrelated repository-wide TypeScript debt remains outside the currently selected cluster.
 
