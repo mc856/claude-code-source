@@ -7,3 +7,5 @@ tsc-errors-*.txt
 .tmp-tsc-*.txt
 .tmp-run*.log
 .tmp-help-*.txt
+.local/
+openspec/changes/apih-openai-local-proxy/
