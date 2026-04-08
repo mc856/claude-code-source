@@ -139,13 +139,35 @@ export async function initJetBrainsDetection(): Promise<void> {
   }
 }
 
-// Combined export that includes all env properties plus dynamic functions
-export const envDynamic = {
-  ...env, // Include all properties from env
-  terminal: getTerminalWithJetBrainsDetection(),
-  getIsDocker,
-  getIsBubblewrapSandbox,
-  isMuslEnvironment,
-  getTerminalWithJetBrainsDetectionAsync,
-  initJetBrainsDetection,
+type EnvDynamic = typeof env & {
+  terminal: string | null
+  getIsDocker: typeof getIsDocker
+  getIsBubblewrapSandbox: typeof getIsBubblewrapSandbox
+  isMuslEnvironment: typeof isMuslEnvironment
+  getTerminalWithJetBrainsDetectionAsync: typeof getTerminalWithJetBrainsDetectionAsync
+  initJetBrainsDetection: typeof initJetBrainsDetection
 }
+
+// Keep env reads lazy so circular imports do not touch env before env.ts finishes
+// initializing. This preserves the existing envDynamic surface without eagerly
+// spreading env at module load time.
+export const envDynamic = new Proxy(
+  {
+    getIsDocker,
+    getIsBubblewrapSandbox,
+    isMuslEnvironment,
+    getTerminalWithJetBrainsDetectionAsync,
+    initJetBrainsDetection,
+  },
+  {
+    get(target, prop, receiver) {
+      if (prop === 'terminal') {
+        return getTerminalWithJetBrainsDetection()
+      }
+      if (Reflect.has(target, prop)) {
+        return Reflect.get(target, prop, receiver)
+      }
+      return Reflect.get(env, prop)
+    },
+  },
+) as EnvDynamic

@@ -77,13 +77,16 @@ function collectMissingRelativeImports(): MissingImport[] {
   const missing: MissingImport[] = []
   const seen = new Set<string>()
   const pattern =
-    /(?:import|export)\s+[\s\S]*?from\s+['"](\.\.?\/[^'"]+)['"]|require\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g
+    /(?:import(?!\s+type\b)|export(?!\s+type\b))\s+[\s\S]*?from\s+['"](\.\.?\/[^'"]+)['"]|require\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g
 
   for (const file of files) {
     const text = readFileSync(file, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1')
     for (const match of text.matchAll(pattern)) {
       const specifier = match[1] ?? match[2]
       if (!specifier) continue
+      if (specifier.endsWith('.node')) continue
       const target = resolve(dirname(file), specifier)
       if (hasResolvableTarget(target)) continue
       const key = `${file} -> ${specifier}`

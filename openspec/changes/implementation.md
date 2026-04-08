@@ -36,6 +36,193 @@ Current file status:
 - the content is already usable
 - the main change needed is to keep newer entries clearly grouped by review pass so task status, bug findings, and remediation do not blur together
 
+## 2026-04-07 Debug Record: Provider Live Smoke Validation
+
+### Review Summary
+
+After establishing the deterministic provider validation gate, the next bounded follow-up was to expose a separate live smoke layer for environments that do have real provider credentials.
+
+This pass kept that layer opt-in and environment-dependent by design:
+- default repository validation remains deterministic and secrets-free
+- live provider prompt execution is available only through a separate command
+- the default behavior of that command is to skip successfully unless explicitly enabled
+
+Current live smoke entrypoint after this pass:
+- `bun run ./scripts/validate-provider-live-smoke.mjs`
+- `npm run validate:providers:live`
+
+### Debug Record: Default Gate Versus Live Smoke Boundary
+
+#### Symptom
+
+The repository now had a deterministic provider gate, but no explicit place to put real provider-backed prompt execution without weakening the default validation contract.
+
+#### Root Cause
+
+Live prompt execution depends on credentials, network reachability, and remote provider state, while the required regression gate must stay local and reproducible.
+
+#### Decision
+
+Add a separate live smoke command instead of extending `validate:providers` in place.
+
+That command must:
+- require explicit opt-in
+- report per-provider `ok`, `failed`, or `skipped`
+- skip safely when no providers are selected or configured
+- reuse the restored source runtime through `bun run ./src/dev-entry.ts --provider <name> -p`
+
+#### Fix
+
+This pass added:
+- `src/services/providers/liveSmoke.ts`
+  - parses requested provider lists
+  - infers candidate providers from configured credentials/endpoints
+  - computes provider-specific skip reasons
+- `src/services/providers/liveSmoke.test.ts`
+  - verifies enablement, provider parsing, inference, and skip-reason logic
+- `scripts/validate-provider-live-smoke.mjs`
+  - implements the opt-in live smoke contract
+  - skips successfully when live smoke is not enabled
+  - runs selected provider prompt checks only when explicitly enabled
+- `package.json`
+  - adds `validate:providers:live`
+
+### Validation Notes
+
+Executed new live-smoke-local validation:
+- `bun test src/services/providers/liveSmoke.test.ts`
+- `bun run ./scripts/validate-provider-live-smoke.mjs`
+- `npm run validate:providers:live`
+
+Observed results:
+- helper tests: green
+- direct live smoke script without opt-in: skipped successfully
+- package live smoke command without opt-in: skipped successfully
+
+Executed regression check for the existing deterministic provider gate:
+- `bun run ./scripts/validate-provider-runtime.mjs`
+
+Observed result:
+- deterministic provider validation remains green after the live smoke addition
+
+Intentionally unvalidated in this pass:
+- actual live provider prompt success for Claude, OpenAI, or Azure OpenAI in this local environment
+- CI automation for the live smoke script
+
+### Remaining Follow-up
+
+- If a secured environment later exists for provider-backed smoke CI, wire this script in there rather than promoting it into the default repository gate.
+- If operators need richer prompt-success matching later, extend the smoke predicate separately from the current strict `OK` contract.
+
+## 2026-04-07 Debug Record: Provider Runtime Validation
+
+### Review Summary
+
+The new `provider-runtime-validation` change established a deterministic provider regression gate on top of the already-restored source runtime.
+
+This pass deliberately did not broaden provider features. Instead it reused the existing provider startup-validation and diagnostics helpers to create a repeatable validation matrix for:
+- `claude`
+- `openai`
+- `azure-openai`
+
+Current validation entrypoints after this pass:
+- `bun run ./scripts/validate-provider-runtime.mjs`
+- `npm run validate:restoration`
+- `bun run ./src/dev-entry.ts -p "Say OK only."`
+
+### Debug Record: Validation Helper Inventory And Gap
+
+#### Symptom
+
+Provider abstraction, provider diagnostics, and provider-model validation already existed in source, but there was no bounded runtime-facing validation command that combined them into a maintained regression gate.
+
+#### Root Cause
+
+Provider behavior was spread across reusable helpers and tests:
+- `src/services/providers/config.ts`
+- `src/services/providers/validate.ts`
+- `src/services/providers/diagnostics.ts`
+- `src/bootstrap/state.ts`
+- provider adapter tests under `src/services/providers/*.test.ts`
+
+The repository still relied on maintainers remembering ad hoc command sequences for runtime confirmation.
+
+#### Decision
+
+Add one deterministic provider runtime validation script that:
+- reuses source helpers directly for provider config, diagnostics, and compatibility checks
+- keeps live network calls out of the default regression gate
+- still exercises one real source-runtime command boundary for the known Claude `--bare` auth case
+
+#### Fix
+
+This pass added:
+- `scripts/validate-provider-runtime.mjs`
+  - validates source version baseline
+  - checks expected Claude `--bare` auth boundary
+  - checks Claude diagnostics snapshot
+  - checks OpenAI startup validation and missing-key failure
+  - checks Azure OpenAI startup validation and missing-endpoint/deployment failure
+  - checks diagnostics output for resolved model and credential-source context
+- `package.json`
+  - adds `validate:providers`
+- `src/services/providers/provider-selection.test.ts`
+  - extends automated coverage for missing OpenAI credentials, missing Azure config, and provider diagnostics reporting
+
+### Debug Record: Provider Boundary Clarification
+
+#### Symptom
+
+The earlier restoration work showed that a Claude `--bare` auth failure could be misread as a runtime regression.
+
+#### Root Cause
+
+`--bare` intentionally disables OAuth and keychain reads, so it validates a different auth boundary from the normal non-bare source runtime.
+
+#### Decision
+
+Encode this outcome directly into the provider validation script as an expected pass condition rather than leaving it as only a historical note.
+
+#### Fix
+
+`scripts/validate-provider-runtime.mjs` now treats a nonzero exit with `Not logged in` on:
+- `bun run ./src/dev-entry.ts --bare --provider claude -p "Say OK only."`
+
+as a successful validation of the documented boundary.
+
+### Validation Notes
+
+Executed provider validation:
+- `bun test src/services/providers/provider-selection.test.ts`
+- `bun run ./scripts/validate-provider-runtime.mjs`
+
+Observed provider validation summary:
+- source version baseline: ok
+- Claude bare auth boundary: ok
+- Claude diagnostics snapshot: ok
+- OpenAI startup validation and diagnostics: ok
+- OpenAI missing API key failure: ok
+- Azure startup validation and diagnostics: ok
+- Azure missing endpoint failure: ok
+
+Executed existing restored-runtime checks:
+- `npm run validate:restoration`
+- `bun run ./src/dev-entry.ts -p "Say OK only."`
+
+Observed restored-runtime results:
+- restoration validation: green
+- normal non-bare print path: returned `OK`
+
+Intentionally unvalidated in this pass:
+- live OpenAI prompt execution against a real endpoint
+- live Azure OpenAI prompt execution against a real deployment
+- Anthropic-only bridge, remote-session, and OAuth feature parity for non-Claude providers
+
+### Remaining Follow-up
+
+- If teams later want live provider smoke coverage, add it as an explicit opt-in follow-up rather than folding secrets-dependent checks into the default regression gate.
+- Consider folding `validate:providers` into a broader restored-runtime validation suite only after both commands stay stable across several follow-up changes.
+
 ## 2026-04-03 Debug Record: Runtime Restoration Baseline Round 1
 
 ### Review Summary
@@ -2342,3 +2529,672 @@ Create a dedicated follow-up change, `restored-runtime-activation`, for:
 - unresolved relative-import inventory and classification
 
 Do not pull this follow-up back into `runtime-restoration-baseline` or continue treating it as implied remaining work inside `high-yield-debt-reduction`.
+
+## 2026-04-07 Debug Record: Restored Runtime Activation Round 1
+
+### Review Summary
+
+The first execution pass for `restored-runtime-activation` focused on analysis and task closure rather than speculative source restoration. The goal of this pass was to convert two ambiguous problem statements into explicit execution contracts:
+
+- what the direct runtime activation gate actually is
+- what the 86 unresolved relative imports should be treated as
+
+Current state after this pass:
+
+- the direct activation gate is explicitly distinct from the restoration baseline and from repository-wide `tsc`
+- `bun run dev` is explicitly treated as scanner-mode behavior, not as proof of direct runtime failure
+- the unresolved relative-import inventory is captured and grouped
+- treatment rules and follow-up buckets are recorded in `openspec/changes/restored-runtime-activation/inventory.md`
+
+### Debug Record: Direct Runtime Gate Reconfirmed
+
+#### Symptom
+
+The repository had no stable working distinction between:
+
+- startup baseline validation
+- development-launcher diagnostics
+- true direct source runtime activation
+
+This made `bun run dev` appear to be a runtime regression even though it is currently scanner-gated by design.
+
+#### Root Cause
+
+The donor-infrastructure pass introduced `src/dev-entry.ts` as a scanner and launcher, but the follow-up contract for runtime activation versus scanner behavior had not yet been written down as an executable rule set.
+
+#### Decision
+
+Use the following as the direct runtime activation gate for the current phase:
+
+- `bun src/entrypoints/cli.tsx --version`
+- `bun src/entrypoints/cli.tsx --help`
+- `npm run validate:restoration`
+- `bun src/entrypoints/cli.tsx --bare -p "Say OK only."`
+
+Treat `bun run dev` as scanner-mode behavior until explicit forwarding criteria are met.
+
+#### Verification
+
+Executed:
+
+- `bun src/entrypoints/cli.tsx --version`
+- `bun src/entrypoints/cli.tsx --help`
+- `npm run validate:restoration`
+- `bun run ./src/dev-entry.ts --version`
+- `bun run ./src/dev-entry.ts`
+
+Observed result:
+
+- baseline commands remain green
+- `bun run dev` still reports `missing_relative_imports=86` and exits in scanner mode
+
+### Debug Record: Direct Print Path Narrowing
+
+#### Symptom
+
+`bun src/entrypoints/cli.tsx --bare -p "Say OK only." --debug --debug-file ...` still does not complete in the current bounded window.
+
+#### Root Cause
+
+The initial suspicion was that telemetry initialization itself might be blocking, because the last emitted debug line came from telemetry setup.
+
+Further code-path review invalidated that assumption for print mode:
+
+- `initializeTelemetryAfterTrust()` is invoked without `await` on the print-mode path
+- the log position therefore does not identify telemetry as the blocking awaited stage
+
+#### Decision
+
+Treat the active blocker as post-startup headless runtime activation rather than telemetry startup specifically.
+
+The next narrow blocker zone is the awaited print-mode chain after startup completes, especially:
+
+- org validation
+- headless initialization
+- awaited MCP connection batch
+- first request-path setup
+
+#### Verification
+
+Executed:
+
+- `bun src/entrypoints/cli.tsx --bare -p "Say OK only." --debug --debug-file .tmp-runtime-activation.log`
+
+Observed result:
+
+- the command still stalls without a printed response
+- the debug log reaches startup completion and telemetry kickoff
+- code-path review shows telemetry kickoff is fire-and-forget in print mode, so the stall must be downstream of that point
+
+### Debug Record: Missing Import Inventory And Triage
+
+#### Symptom
+
+The launcher reported an unresolved-import count, but there was no authoritative grouped inventory and no agreed repair strategy per item class.
+
+#### Root Cause
+
+Missing-import work was still at risk of collapsing into raw count reduction or file-by-file cleanup.
+
+#### Decision
+
+Capture the inventory and classify each family into one of four treatment types:
+
+- `restore`
+- `shim`
+- `guard`
+- `defer`
+
+Use grouped follow-up buckets rather than import-list order.
+
+#### Verification
+
+Executed:
+
+- refresh of the full `src/dev-entry.ts` unresolved-import scan
+- grouping of the scan by importer root and rough treatment signal
+
+Observed result:
+
+- total unresolved relative imports: `86`
+- rough composition:
+  - asset/native gaps: `31`
+  - likely internal/dead-code-eliminated surfaces: `30`
+  - ordinary source gaps: `16`
+  - shared type gaps: `9`
+
+Recorded output:
+
+- `openspec/changes/restored-runtime-activation/inventory.md`
+
+### Follow-up Decision
+
+The next implementation pass should not start by reducing the raw unresolved-import count.
+
+Instead it should start with one of these bounded buckets:
+
+- low-risk shared support-file restoration
+- internal-feature guard layer for clearly unsupported surfaces
+- compatibility shims for shared type/native boundaries
+
+That work can now proceed without reopening the earlier mistake of broad repository-wide `tsc` cleanup.
+
+## 2026-04-07 Debug Record: Restored Runtime Activation Round 2
+
+### Review Summary
+
+The second pass moved from analysis into bounded restoration. The goal was to exhaust the cheapest real `restore` work before switching the change into `guard` and `shim` mode.
+
+Observed result:
+
+- `bun run ./src/dev-entry.ts --version` moved from `missing_relative_imports=86` to `missing_relative_imports=38`
+- the restored files were low-risk support files, placeholders, and documentation assets rather than speculative internal subsystem implementations
+- the remaining unresolved imports now skew strongly toward internal/optional features and compatibility boundaries
+
+### Debug Record: Restore Bucket Execution
+
+#### Decision
+
+Implement the lowest-risk donor-backed restore groups first:
+
+- shared support files used by multiple importers
+- lightweight bundled skill placeholders
+- bundled `claude-api` text assets as placeholders
+- lightweight source placeholders for `query/transitions` and `utils/taskSummary`
+
+#### Fix
+
+This pass added:
+
+- `src/services/lsp/types.ts`
+- `src/services/tips/types.ts`
+- `src/utils/filePersistence/types.ts`
+- `src/services/remoteManagedSettings/securityCheck.jsx`
+- `src/utils/permissions/yolo-classifier-prompts/*`
+- `src/ink/cursor.ts`
+- `src/ink/events/paste-event.ts`
+- `src/ink/events/resize-event.ts`
+- `src/utils/ultraplan/prompt.txt`
+- `src/skills/bundled/dream.ts`
+- `src/skills/bundled/hunter.ts`
+- `src/skills/bundled/runSkillGenerator.ts`
+- `src/skills/bundled/claude-api/**` placeholder docs
+- `src/query/transitions.ts`
+- `src/utils/taskSummary.ts`
+
+#### Verification
+
+Executed:
+
+- repeated `bun run ./src/dev-entry.ts --version` after each restore group
+- targeted file diagnostics for the newly added restore files
+
+Observed result:
+
+- after the first support-file bucket: `missing_relative_imports=70`
+- after the second lightweight placeholder bucket: `missing_relative_imports=66`
+- after the bundled `claude-api` placeholders: `missing_relative_imports=40`
+- after the final lightweight source placeholders: `missing_relative_imports=38`
+- no direct file errors were reported for the newly added restore files
+
+### Follow-up Decision
+
+The restore-oriented phase has now delivered most of its cheap value.
+
+The next efficient pass should focus on:
+
+- `guard` for internal or unsupported surfaces such as UDS, worker agents, skill-search internals, SSH extras, and Anthropic-only REPL adjuncts
+- `shim` for compatibility boundaries such as `mcpSkills.js` and `image-processor.node`
+- optional scanner cleanup for comment-driven false positives in `commands/clear/index.ts`
+
+Continuing to treat the remaining 38 entries as pure restore work would no longer be the high-yield path.
+
+## 2026-04-07 Debug Record: Restored Runtime Activation Round 3
+
+### Review Summary
+
+The third pass executed the first bounded internal-surface `guard` and compatibility `shim` bucket rather than continuing generic restoration.
+
+Observed result:
+
+- `bun run ./src/dev-entry.ts --version` moved from `missing_relative_imports=38` to `missing_relative_imports=22`
+- the newly added files are all degraded no-op or empty-return implementations for explicitly optional or internal surfaces
+- the remaining unresolved imports now cluster around Anthropic-only UI adjuncts, SSH extras, internal prompt helpers, and the known `commands/clear/index.ts` false positives
+
+### Debug Record: Internal Guard Bucket Execution
+
+#### Decision
+
+Implement the smallest remaining donor-style guard bucket whose exports were clearly defined by current callsites:
+
+- experimental skill-search helpers
+- coordinator worker-agent surfaces
+- assistant session discovery
+- UDS and bridge peer messaging helpers
+- protected namespace check
+
+Add the minimal MCP skill shim needed to preserve existing `.cache.delete(...)` callsites without trying to recreate MCP skill discovery behavior.
+
+#### Fix
+
+This pass added:
+
+- `src/services/skillSearch/featureCheck.ts`
+- `src/services/skillSearch/prefetch.ts`
+- `src/services/skillSearch/remoteSkillState.ts`
+- `src/services/skillSearch/remoteSkillLoader.ts`
+- `src/services/skillSearch/signals.ts`
+- `src/services/skillSearch/telemetry.ts`
+- `src/coordinator/workerAgent.ts`
+- `src/assistant/sessionDiscovery.ts`
+- `src/utils/udsMessaging.ts`
+- `src/utils/udsClient.ts`
+- `src/bridge/peerSessions.ts`
+- `src/skills/mcpSkills.ts`
+- `src/utils/protectedNamespace.ts`
+
+Implementation posture:
+
+- feature probes return disabled or empty values
+- remote or peer messaging paths degrade with explicit failure results instead of missing-module crashes
+- assistant discovery and coordinator agents return empty collections
+- `fetchMcpSkillsForClient` preserves memoized cache shape through a `.cache` `Map`
+
+#### Verification
+
+Executed:
+
+- file diagnostics on all newly added guard/shim files
+- `bun run ./src/dev-entry.ts --version`
+- `bun run ./src/dev-entry.ts`
+
+Observed result:
+
+- no direct file diagnostics were reported for the new files
+- scanner count reduced to `22`
+- top remaining unresolved imports are now:
+  - `commands/agents-platform/index.js`
+  - `services/compact/cachedMCConfig.js`
+  - `tools/DiscoverSkillsTool/prompt.js`
+  - `bridge/webhookSanitizer.js`
+  - `ssh/*`
+  - `jobs/classifier.js`
+  - several Anthropic-only REPL callouts and internal tool panels
+  - `tools/SnipTool/prompt.js`
+  - internal-only classifier helper tool surfaces
+
+### Follow-up Decision
+
+The next useful work is now narrower than the prior guard bucket.
+
+Highest-yield options are:
+
+- scanner cleanup for the two `commands/clear/index.ts` comment-driven false positives
+- a final small guard bucket for `jobs/classifier.js`, `cachedMCConfig.js`, `DiscoverSkillsTool/prompt.js`, and `bridge/webhookSanitizer.js`
+- defer or continue guarding Anthropic-only REPL callouts, SSH helpers, and internal tool panels only if the launcher still benefits materially
+
+## 2026-04-07 Debug Record: Restored Runtime Activation Round 4
+
+### Review Summary
+
+The fourth pass finished the scanner-side restoration work.
+
+Observed result:
+
+- the launcher moved from `missing_relative_imports=22` to forwarding behavior
+- `bun run ./src/dev-entry.ts --version` now prints `2.1.88`
+- `bun run ./src/dev-entry.ts --help` now prints the real CLI help output
+
+### Debug Record: Scanner Overcount Removal
+
+#### Symptom
+
+After the previous guard buckets, the remaining scanner blockers were dominated by non-runtime surfaces:
+
+- `import type` and `export type` references
+- comment-text false positives in `commands/clear/index.ts`
+- optional native `.node` bindings already wrapped in `try/catch`
+
+These kept `src/dev-entry.ts` in scanner mode even though they were no longer meaningful launcher blockers.
+
+#### Decision
+
+Align `src/dev-entry.ts` with the active runtime contract instead of raw static import counting.
+
+Specifically:
+
+- ignore type-only imports/exports
+- strip comments before import scanning
+- ignore optional `.node` bindings that are already runtime-guarded
+
+#### Fix
+
+This pass updated `src/dev-entry.ts` to exclude the over-counted cases above.
+
+This pass also added the last thin stubs required for feature-gated surfaces that were still keeping the scanner from forwarding:
+
+- `src/assistant/gate.ts`
+- `src/proactive/useProactive.ts`
+- `src/tools/PushNotificationTool/PushNotificationTool.ts`
+- `src/tools/REPLTool/REPLTool.ts`
+- `src/tools/SendUserFileTool/SendUserFileTool.ts`
+- `src/tools/SleepTool/SleepTool.ts`
+- `src/tools/SubscribePRTool/SubscribePRTool.ts`
+- `src/tools/SuggestBackgroundPRTool/SuggestBackgroundPRTool.ts`
+- `src/tools/VerifyPlanExecutionTool/VerifyPlanExecutionTool.ts`
+
+#### Verification
+
+Executed:
+
+- `bun run ./src/dev-entry.ts --version`
+- `bun run ./src/dev-entry.ts --help`
+
+Observed result:
+
+- `--version` forwarded to the real entrypoint and returned `2.1.88`
+- `--help` forwarded to the real entrypoint and printed the actual CLI help
+- direct launcher forwarding is now restored for the validated argument paths
+
+### Follow-up Decision
+
+Further work should now focus on direct runtime behavior rather than additional scanner cleanup.
+
+If the user wants to continue this line, the next highest-yield step is to retest and narrow the real forwarded runtime path, especially the existing `--bare -p` headless stall, now that scanner-mode launcher blocking has been removed.
+
+### Validation Addendum
+
+Executed after forwarding recovery:
+
+- `npm run validate:restoration`
+- `bun run ./src/dev-entry.ts --bare -p "Say OK only." --debug --debug-file .tmp-runtime-activation-dev-entry.log`
+
+Observed result:
+
+- restoration validation remains green
+- the forwarded headless prompt path still did not complete within the 120s bounded window
+- the new debug tail still ends in the same narrowed startup region around startup completion and telemetry initialization, not in scanner-mode restoration code
+
+Interpretation:
+
+- scanner-side launch blocking is now resolved
+- the remaining active issue is again the real forwarded headless runtime stall
+
+## 2026-04-07 Debug Record: Restored Runtime Activation Round 5
+
+### Review Summary
+
+The fifth pass resolved the forwarded headless runtime stall enough to reach the real auth boundary.
+
+Observed result:
+
+- `bun -e "await import('./src/cli/structuredIO.ts')"` initially failed with a concrete module-initialization error rather than hanging
+- `bun -e "await import('./src/cli/print.ts')"` then exposed one remaining missing-export defect in a previously restored placeholder file
+- after both fixes, `bun run ./src/dev-entry.ts --bare -p "Say OK only."` now reaches `runHeadless()`, initializes the request path, and exits with the expected auth error for an unauthenticated local environment: `Not logged in · Please run /login`
+
+### Debug Record: envDynamic Circular-Initialization Fix
+
+#### Symptom
+
+After narrowing the forwarded stall to `await import('src/cli/print.js')`, directly importing `src/cli/structuredIO.ts` revealed:
+
+- `ReferenceError: Cannot access 'env' before initialization`
+- thrown from `src/utils/envDynamic.ts`
+
+#### Root Cause
+
+`src/utils/envDynamic.ts` eagerly constructed `envDynamic` with `...env` at module load time.
+
+That forced an immediate read of `env` during a circular import path, producing a temporal-dead-zone failure before the print runtime could finish evaluating.
+
+#### Decision
+
+Preserve the `envDynamic` surface, but make environment-property reads lazy so module evaluation does not touch `env` before `src/utils/env.ts` completes initialization.
+
+#### Fix
+
+Updated `src/utils/envDynamic.ts` to export `envDynamic` via a `Proxy` that:
+
+- serves the dynamic helper methods from the proxy target
+- computes `terminal` lazily through `getTerminalWithJetBrainsDetection()`
+- falls back to `env` property reads only when the property is actually accessed
+
+#### Verification
+
+Executed:
+
+- `bun -e "await import('./src/cli/structuredIO.ts'); console.log('structuredIO ok')"`
+
+Observed result:
+
+- the import now completes successfully
+
+### Debug Record: File Persistence Type Surface Completion
+
+#### Symptom
+
+After the `envDynamic` fix, directly importing `src/cli/print.ts` exposed a second real runtime defect:
+
+- `SyntaxError: Export named 'DEFAULT_UPLOAD_CONCURRENCY' not found in module 'src/utils/filePersistence/types.ts'`
+
+#### Root Cause
+
+The earlier restoration pass added `src/utils/filePersistence/types.ts` as an overly thin placeholder that only exported `TurnStartTime`, while the active runtime path required:
+
+- `DEFAULT_UPLOAD_CONCURRENCY`
+- `FILE_COUNT_LIMIT`
+- `OUTPUTS_SUBDIR`
+- `PersistedFile`
+- `FailedPersistence`
+- `FilesPersistedEventData`
+
+#### Decision
+
+Replace the placeholder with the smallest complete type/constants surface required by current `filePersistence.ts` consumers instead of further guarding the callsite.
+
+#### Fix
+
+Expanded `src/utils/filePersistence/types.ts` to export the missing constants and event/result types used by `src/utils/filePersistence/filePersistence.ts`.
+
+#### Verification
+
+Executed:
+
+- `bun -e "await import('./src/cli/print.ts'); console.log('print ok')"`
+
+Observed result:
+
+- the import now completes successfully
+
+### Validation Notes
+
+Executed:
+
+- `bun -e "await import('./src/services/settingsSync/index.ts'); console.log('settingsSync ok')"`
+- `bun -e "await import('./src/services/remoteManagedSettings/index.ts'); console.log('remoteManagedSettings ok')"`
+- `bun -e "await import('./src/cli/remoteIO.ts'); console.log('remoteIO ok')"`
+- `bun -e "await import('./src/cli/structuredIO.ts'); console.log('structuredIO ok')"`
+- `bun -e "await import('./src/cli/print.ts'); console.log('print ok')"`
+- `bun run ./src/dev-entry.ts --version`
+- `bun run ./src/dev-entry.ts --bare -p "Say OK only." --debug --debug-file .tmp-runtime-import-probe-3.log`
+
+Observed result:
+
+- isolated import validation now succeeds for the previously blocked print-runtime chain
+- launcher forwarding still returns `2.1.88` for `--version`
+- the forwarded headless prompt path now reaches the real API request path and fails only because no local auth method is configured
+
+### Remaining Follow-up
+
+- Treat the current `Not logged in · Please run /login` result as the expected environment-level boundary for unauthenticated validation, not as a restored-source runtime defect.
+- If deeper end-to-end prompt validation is desired, the next step is to test with a real login or explicit API key rather than continuing import-restoration work.
+
+## 2026-04-07 Debug Record: Mirror Gap Reduction Round 1
+
+### Review Summary
+
+The first execution pass for `mirror-gap-reduction` closed the phase boundary between runtime activation and post-activation gap cleanup.
+
+Observed result:
+
+- the normal non-bare launcher path remains healthy
+- bare-mode auth failure remains expected behavior rather than a restore regression
+- the currently known active non-bare placeholder surface is small and no new too-thin runtime placeholder was discovered beyond the phase-1 `filePersistence/types.ts` fix already completed under `restored-runtime-activation`
+
+### Debug Record: Phase Boundary Confirmation
+
+#### Decision
+
+Use the following as the phase-2 regression boundary:
+
+- `bun run ./src/dev-entry.ts --version`
+- `bun run ./src/dev-entry.ts -p "Say OK only."`
+- `node scripts/validate-restoration.mjs`
+
+Do not use raw missing-import totals or bare-mode OAuth behavior as the main success signal for this phase.
+
+#### Verification
+
+Executed:
+
+- `bun run ./src/dev-entry.ts --version`
+- `bun run ./src/dev-entry.ts -p "Say OK only."`
+- `node scripts/validate-restoration.mjs`
+
+Observed result:
+
+- version path returned `2.1.88`
+- non-bare prompt path returned `OK`
+- restoration validation remained green for source version/help and prebuilt version
+
+### Debug Record: Active Non-Bare Placeholder Refresh
+
+#### Symptom
+
+Phase-2 needed an updated answer to a narrower question than the phase-1 inventory: which remaining placeholders or guards are still exercised by active non-bare runtime or validation paths?
+
+#### Decision
+
+Refresh the inventory by checking current importer relationships and current launcher behavior rather than by re-running raw scanner accounting.
+
+#### Verification
+
+Observed current active non-bare placeholder or guard imports:
+
+- `src/services/remoteManagedSettings/index.ts` -> `./securityCheck.jsx`
+- `src/setup.ts`, `src/cli/print.ts`, `src/utils/messages/systemInit.ts` -> `../utils/udsMessaging.js`
+- `src/main.tsx`, `src/dialogLaunchers.tsx` -> `./assistant/sessionDiscovery.js`
+- `src/constants/prompts.ts`, `src/utils/attachments.ts`, `src/tools/SkillTool/SkillTool.ts` -> `../services/skillSearch/featureCheck.js`
+
+Observed mostly type-only or non-runtime-facing placeholder consumers:
+
+- `src/types/plugin.ts`, `src/utils/plugins/lspPluginIntegration.ts` -> `../services/lsp/types.js`
+
+Interpretation:
+
+- `securityCheck.jsx` and `udsMessaging.js` remain on live non-bare startup paths but currently provide sufficient degraded behavior for the validated launcher flows
+- `sessionDiscovery.js` remains part of an assistant-attach branch, but no current regression indicates the existing degraded empty-session behavior is too thin for the supported phase-2 boundary
+- `featureCheck.js` remains in optional discovery/prompt surfaces, not in the minimal non-bare success path
+- no new active-path placeholder was found that requires immediate hardening beyond the already-completed `filePersistence/types.ts` expansion
+
+### Follow-up Decision
+
+- Phase-2 can mark the initial boundary and active-path refresh work complete without adding new runtime hardening code in this pass.
+- The next efficient work should focus on guard/defer consolidation and on deciding whether any assistant/UDS/security placeholders deserve stronger contracts for later supported flows.
+
+## 2026-04-07 Debug Record: Mirror Gap Reduction Round 2
+
+### Review Summary
+
+The second execution pass completed the phase-2 consolidation work.
+
+Observed result:
+
+- the remaining `guard` bucket is now explicitly treated as intentionally unsupported internal, optional, or branch-specific mirror behavior
+- the remaining `defer` bucket is explicitly limited to documentation-heavy or non-essential auxiliary assets
+- the normal launcher validation boundary remains green at the end of the phase
+
+### Debug Record: Guard Bucket Consolidation
+
+#### Decision
+
+Keep the current `guard` bucket limited to surfaces that are still poor candidates for speculative restoration in the current mirror:
+
+- internal session and peer-messaging helpers
+- assistant discovery and agent-worker orchestration helpers
+- remote skill-search helpers
+- Anthropic-only REPL and UI adjuncts
+- SSH / REPL side branches and internal-only tool panels
+
+#### Interpretation
+
+Current examples that remain intentionally guarded rather than restored:
+
+- `udsMessaging.js`, `udsClient.js`, `peerSessions.js`
+- `assistant/sessionDiscovery.js`, `coordinator/workerAgent.js`
+- `services/skillSearch/*`
+- `hooks/useSSHSession.ts` dependencies and REPL-only adjunct panels
+
+These surfaces may still be imported by optional branches, but no current normal non-bare runtime validation indicates they are blocking the supported launcher path.
+
+### Debug Record: Defer Bucket Consolidation
+
+#### Decision
+
+Keep the current `defer` bucket limited to:
+
+- bundled documentation placeholders
+- non-essential prompt assets
+- secondary helper files that are outside the supported normal launcher boundary
+
+#### Interpretation
+
+Current deferred families remain appropriate for later work rather than immediate restoration:
+
+- `skills/bundled/claude-api/**`
+- secondary bundled skill registration placeholders
+- `utils/ultraplan/prompt.txt`
+- `query/transitions.js`, `utils/taskSummary.js`
+- `tools/SnipTool/prompt.js`
+
+No current phase-2 evidence suggests these deferred assets should be promoted back into the active runtime bucket.
+
+### Final Validation Notes
+
+Final phase-2 validation boundary executed in this workspace:
+
+- `bun run ./src/dev-entry.ts --version`
+- `bun run ./src/dev-entry.ts -p "Say OK only."`
+- `node scripts/validate-restoration.mjs`
+
+Observed result:
+
+- version path returned `2.1.88`
+- normal non-bare prompt path returned `OK`
+- restoration validation remained green
+
+### Final Phase Result
+
+This phase reduced ambiguity rather than adding broad new restoration code.
+
+Work actually reduced in this phase:
+
+- phase boundary confusion between runtime activation and post-activation cleanup
+- ambiguity about whether bare-mode OAuth absence is a runtime defect
+- ambiguity about which remaining placeholders are still exercised by active non-bare flows
+- ambiguity about which unresolved families should stay in `guard` or `defer`
+
+Work intentionally preserved for later phases:
+
+- internal and optional guarded surfaces such as assistant discovery, UDS/peer messaging, remote skill search, SSH adjuncts, and Anthropic-only REPL branches
+- documentation-heavy and non-essential deferred assets such as bundled Claude API docs and auxiliary prompts
+
+### Archive Decision
+
+Decision for this phase: leave `mirror-gap-reduction` open only until the task record and inventory updates are complete, then treat it as archive-ready.
+
+Rationale:
+
+- all phase-2 tasks are complete after this pass
+- no active implementation blocker remains inside the phase scope
+- any future work should be opened as a narrower follow-up change rather than extending this consolidation phase indefinitely

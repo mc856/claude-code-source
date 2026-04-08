@@ -20,7 +20,9 @@
     "dev": "bun run ./src/dev-entry.ts",
     "start": "bun run ./src/dev-entry.ts",
     "version:restored": "bun run ./src/dev-entry.ts --version",
-    "validate:restoration": "node scripts/validate-restoration.mjs"
+    "validate:restoration": "node scripts/validate-restoration.mjs",
+    "validate:providers": "bun run ./scripts/validate-provider-runtime.mjs",
+    "validate:providers:live": "bun run ./scripts/validate-provider-live-smoke.mjs"
   },
   "dependencies": {
     "@alcalzone/ansi-tokenize": "*",

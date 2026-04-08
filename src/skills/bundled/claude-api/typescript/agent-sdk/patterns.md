@@ -1,0 +1,1 @@
+TypeScript Agent SDK patterns are unavailable in the restored development build.

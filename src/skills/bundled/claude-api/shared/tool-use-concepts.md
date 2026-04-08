@@ -1,0 +1,1 @@
+Shared Claude API tool-use documentation is unavailable in the restored development build.

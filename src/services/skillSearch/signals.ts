@@ -1,0 +1,1 @@
+export type DiscoverySignal = 'assistant_turn' | 'subagent_spawn' | 'user_input'

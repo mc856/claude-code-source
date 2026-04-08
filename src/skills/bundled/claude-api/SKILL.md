@@ -1,0 +1,1 @@
+Claude API bundled skill content is unavailable in the restored development build.

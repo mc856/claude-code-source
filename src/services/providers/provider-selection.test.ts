@@ -71,6 +71,7 @@ describe('provider selection and model compatibility', () => {
     const diag = getProviderDiagnostics()
     expect(diag.provider).toBe('openai')
     expect(diag.resolvedModel).toBe('gpt-4o')
+    expect(diag.credentialSource).toContain('OPENAI_API_KEY')
   })
 
   it('rejects incompatible direct model overrides', () => {
@@ -80,5 +81,40 @@ describe('provider selection and model compatibility', () => {
 
     setMainLoopModelOverride('sonnet')
     expect(getMainLoopModelOverride()).toBeUndefined()
+  })
+
+  it('surfaces missing OpenAI API key during startup validation', () => {
+    process.env.CLAUDE_CODE_PROVIDER = 'openai'
+    process.env.OPENAI_MODEL = 'gpt-4o'
+
+    expect(() =>
+      assertProviderConfigValid(undefined, 'gpt-4o'),
+    ).toThrow(/OPENAI_API_KEY/)
+  })
+
+  it('surfaces missing Azure endpoint and deployment during startup validation', () => {
+    process.env.CLAUDE_CODE_PROVIDER = 'azure-openai'
+    process.env.AZURE_OPENAI_API_VERSION = '2024-02-01'
+
+    expect(() =>
+      assertProviderConfigValid(undefined, 'gpt-4o-deployment'),
+    ).toThrow(/AZURE_OPENAI_ENDPOINT/)
+  })
+
+  it('shows Azure diagnostics with deployment and credential source', () => {
+    process.env.CLAUDE_CODE_PROVIDER = 'azure-openai'
+    process.env.AZURE_OPENAI_ENDPOINT = 'https://example-resource.openai.azure.com'
+    process.env.AZURE_OPENAI_DEPLOYMENT = 'gpt-4o-deployment'
+    process.env.AZURE_OPENAI_API_VERSION = '2024-02-01'
+    process.env.AZURE_OPENAI_API_KEY = 'test-key'
+    setMainLoopModelOverride('gpt-4o-deployment')
+
+    const config = getProviderConfig()
+    expect(config.provider).toBe('azure-openai')
+
+    const diag = getProviderDiagnostics()
+    expect(diag.provider).toBe('azure-openai')
+    expect(diag.resolvedModel).toBe('gpt-4o-deployment')
+    expect(diag.credentialSource).toContain('AZURE_OPENAI_API_KEY')
   })
 })

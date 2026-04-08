@@ -1,0 +1,1 @@
+Shared Claude API error-code documentation is unavailable in the restored development build.

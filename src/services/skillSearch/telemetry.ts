@@ -1,0 +1,1 @@
+export function logRemoteSkillLoaded(_event: Record<string, unknown>): void {}

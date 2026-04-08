@@ -1,0 +1,1 @@
+TypeScript Claude API batches documentation is unavailable in the restored development build.
